@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechNexion SoM - Board , Test Farm</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Toolbar -->
+  <header class="toolbar">
+    <div class="toolbar__left">
+      <h1 class="toolbar__title">TechNexion SoM - Board , Test Farm</h1>
+    </div>
+    <div class="toolbar__center">
+      <div class="grid-switcher">
+        <button data-grid="3x3" class="grid-btn">3×3</button>
+        <button data-grid="4x4" class="grid-btn active">4×4</button>
+        <button data-grid="5x5" class="grid-btn">5×5</button>
+      </div>
+      <div class="page-indicator">
+        <span class="page-current">1</span> / <span class="page-total">1</span>
+      </div>
+    </div>
+    <div class="toolbar__right">
+      <span id="current-date" class="current-date" style="margin-right: 16px; font-weight: 500;"></span>
+      <button id="theme-toggle" class="icon-btn" title="切換主題">🌓</button>
+      <a href="/config.html" class="icon-btn" title="設定">⚙️</a>
+      <span class="last-updated"></span>
+    </div>
+  </header>
+
+  <!-- Dashboard Grid -->
+  <main class="dashboard">
+    <div id="card-grid" class="card-grid grid-3x3">
+      <!-- Cards dynamically inserted -->
+    </div>
+  </main>
+
+  <!-- Off-Hours Overlay -->
+  <div id="off-hours-overlay" class="off-hours-overlay" style="display:none">
+    <div class="off-hours-content">
+      <div class="off-hours-icon">🌙</div>
+      <h2>非工作時間</h2>
+      <p>監控服務於工作日 09:00 - 18:00 運行</p>
+      <p class="off-hours-time"></p>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

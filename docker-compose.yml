@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    container_name: test-farm-dashboard
+    ports:
+      - "4000:4000"
+    volumes:
+      - dashboard_data:/app/data
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Taipei
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  dashboard_data:
+    driver: local

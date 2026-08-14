@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechNexion SoM - 設定</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <a href="/" class="toolbar__back">← 返回儀表盤</a>
+    <h1>TechNexion SoM - 設定</h1>
+    <button id="theme-toggle" class="icon-btn">🌓</button>
+  </header>
+
+  <main class="config-page">
+    <!-- Jenkins Connection Section -->
+    <section class="config-section">
+      <h2>Jenkins 連線設定</h2>
+      <form id="jenkins-form">
+        <div class="form-group">
+          <label>Jenkins URL</label>
+          <input type="url" id="jenkins-url" placeholder="http://10.88.95.1:8080" required>
+        </div>
+        <div class="form-group">
+          <label>使用者名稱</label>
+          <input type="text" id="jenkins-user" required>
+        </div>
+        <div class="form-group">
+          <label>密碼</label>
+          <input type="password" id="jenkins-pass" placeholder="已設定，若不修改請留空">
+        </div>
+        <div class="form-actions">
+          <button type="button" id="test-btn" class="btn btn--secondary">測試連線</button>
+          <button type="submit" class="btn btn--primary">儲存設定</button>
+        </div>
+        <div id="connection-status" class="connection-status"></div>
+      </form>
+    </section>
+
+    <!-- Job Browser Section -->
+    <section class="config-section">
+      <h2>新增監控 Job</h2>
+      <p class="section-desc">從 Jenkins 載入所有 Job，選擇要加入儀表盤監控的項目。</p>
+      <div class="job-browser">
+        <div class="job-add-row">
+          <select id="job-select" class="job-select" disabled>
+            <option value="">-- 請先載入 Jobs --</option>
+          </select>
+          <button id="add-job-btn" class="btn btn--primary" disabled>＋ 新增</button>
+        </div>
+        <div class="job-actions-row">
+          <button id="refresh-jobs" class="btn btn--secondary">🔄 重新載入 Jobs</button>
+          <span id="job-status" class="job-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Card Management Section -->
+    <section class="config-section">
+      <h2>已監控的 Jobs <span id="card-count" class="badge">0</span></h2>
+      <div id="card-manager" class="card-manager">
+        <!-- Sortable card items -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal" style="display:none">
+    <div class="modal__backdrop"></div>
+    <div class="modal__content">
+      <h3>確認刪除</h3>
+      <p>確定要移除 <strong id="delete-job-name"></strong> 嗎？</p>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" id="cancel-delete">取消</button>
+        <button class="btn btn--danger" id="confirm-delete">刪除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/js/config.js"></script>
+</body>
+</html>
