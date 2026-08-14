@@ -6,7 +6,10 @@ module.exports = function(store, jenkins, scheduler) {
   router.post('/jenkins/test', async (req, res) => {
     try {
       const { url, username, password } = req.body;
-      const result = await jenkins.testConnection(url, username, password);
+      // A blank password field means "keep the saved one" - test with that,
+      // otherwise "測試連線" fails for a user who only wants to verify the URL.
+      const existing = store.getJenkinsConfig();
+      const result = await jenkins.testConnection(url, username, password || existing.password);
       res.json(result);
     } catch (err) {
       console.error('Test connection error:', err);
@@ -17,12 +20,13 @@ module.exports = function(store, jenkins, scheduler) {
   router.post('/jenkins/save', async (req, res) => {
     try {
       const { url, username, password } = req.body;
-      // Preserve existing password if not provided
       const existing = store.getJenkinsConfig();
+      // url/username are always sent by the form, so take them as-is (allowing
+      // them to be cleared). The password field is blank when unchanged.
       const configToSave = {
-        url: url || existing.url,
-        username: username || existing.username,
-        password: password || existing.password
+        url: jenkins.normalizeUrl(url !== undefined ? url : existing.url),
+        username: username !== undefined ? username : existing.username,
+        password: password ? password : existing.password
       };
       store.saveJenkinsConfig(configToSave);
       scheduler.startPolling(store, jenkins);
@@ -38,7 +42,7 @@ module.exports = function(store, jenkins, scheduler) {
     res.json({
       url: config.url,
       username: config.username,
-      password: config.password ? '****' : '',
+      password: '',
       hasPassword: !!config.password
     });
   });
@@ -58,33 +62,43 @@ module.exports = function(store, jenkins, scheduler) {
   });
 
   router.get('/dashboard/data', (req, res) => {
-    const data = scheduler.getCachedData();
-    res.json(data);
+    res.json(scheduler.getCachedData());
+  });
+
+  // Single round-trip for the dashboard: cards + build data + settings + clock.
+  // serverTime lets the browser correct for a skewed kiosk clock when it renders
+  // relative times and the "recently completed" highlight.
+  router.get('/dashboard/state', (req, res) => {
+    res.json({
+      cards: store.getCards(),
+      jobs: scheduler.getCachedData(),
+      settings: store.getSettings(),
+      lastPollAt: scheduler.getLastPollAt(),
+      serverTime: Date.now()
+    });
   });
 
   router.post('/cards', async (req, res) => {
-    const { jobName } = req.body;
+    const jobName = typeof req.body.jobName === 'string' ? req.body.jobName.trim() : '';
     if (!jobName) {
       return res.status(400).json({ error: 'jobName is required' });
     }
     const newCard = store.addCard({ jobName });
-    
-    // Trigger immediate poll for that job
+
+    // Trigger an immediate poll so the new card is not blank until the next tick
     const config = store.getJenkinsConfig();
     if (config.url) {
-      jenkins.fetchJobDetail(config, jobName).then(detail => {
-        if (detail) {
-          const cache = scheduler.getCachedData();
-          cache[jobName] = detail;
-        }
-      }).catch(err => console.error('Immediate poll failed for new card', err));
+      jenkins.fetchJobDetail(config, jobName)
+        .then(detail => scheduler.setCachedJob(jobName, detail))
+        .catch(err => console.error('Immediate poll failed for new card:', err.message));
     }
 
     res.json(newCard);
   });
 
   router.delete('/cards/:id', (req, res) => {
-    store.removeCard(req.params.id);
+    const removed = store.removeCard(req.params.id);
+    if (removed) scheduler.removeCachedJob(removed.jobName);
     res.json({ success: true });
   });
 
@@ -112,8 +126,7 @@ module.exports = function(store, jenkins, scheduler) {
   });
 
   router.put('/settings', (req, res) => {
-    const updated = store.updateSettings(req.body);
-    res.json(updated);
+    res.json(store.updateSettings(req.body));
   });
 
   router.get('/cards', (req, res) => {

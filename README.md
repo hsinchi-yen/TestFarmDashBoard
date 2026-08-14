@@ -6,9 +6,10 @@
 
 ## 🌟 核心特色 (Features)
 
-- **即時狀態卡片監控**：直觀色塊呈現建置狀態（綠色：成功、紅色：失敗、黃色：建置中、灰色：尚未建置 / 中止）。
-- **靈活網格佈局**：支援 `3x3`、`4x4`、`5x5` 網格維度即時切換，適配各類螢幕與電視牆顯示。
-- **自動分頁輪播**：當監控卡片數量超出當前網格容量時，自動進行 30 秒平滑換頁輪播。
+- **即時狀態卡片監控**：直觀色塊呈現建置狀態（綠色：SUCCESS、紅色：FAILURE、黃色閃爍：BUILDING、琥珀色：UNSTABLE、灰色：ABORTED / DISABLED / NOT BUILT）。
+- **最新完成測試閃爍提示**：所有卡片中「最近一筆完成」的測試，會在完成後的 **8 小時內**持續以光暈脈動閃爍，並加上「🆕 剛完成」標籤；工具列同步顯示對應的提示標籤，即使該卡片目前不在顯示中的頁面也不會錯過。
+- **靈活網格佈局**：支援 `3x3`、`4x4`、`5x5` 網格維度即時切換，適配各類螢幕與電視牆顯示。畫面固定為一個視窗高度、永不出現捲軸；空間不足時卡片會依序自動收起次要資訊列。
+- **自動分頁輪播**：當監控卡片數量超出當前網格容量時，自動進行平滑換頁輪播（預設 30 秒，可由 `settings.autoRotateInterval` 調整）；只有一頁時不輪播。
 - **建置趨勢圖表**：每張卡片皆內嵌基於 HTML5 Canvas 的最近 10 次建置趨勢圖，無需依賴肥大第三方圖表庫。
 - **自訂別名與拖曳排序**：支援在設定頁面以 HTML5 原生拖曳 API 調整卡片順序，並可即時編輯自訂別名 (Alias)。
 - **工作時間智慧省流**：前端自動判斷工作時間（週一至週五 09:00 - 18:00），非工作時間自動停止輪詢並顯示「Off Hours」休眠提示層，節省伺服器與網路資源。
@@ -140,13 +141,14 @@ npm start
 | `POST` | `/api/jenkins/save` | 儲存 Jenkins 連線憑證與 URL | 寫入 `data/config.json` |
 | `GET` | `/api/jenkins/config` | 取得當前 Jenkins 連線設定 | 密碼欄位回傳遮罩 |
 | `GET` | `/api/jenkins/jobs` | 取得 Jenkins 頂層所有 Job 清單 | 供設定頁面選取 |
-| `GET` | `/api/dashboard/data` | 取得所有監控卡片的最新快取建置資料 | 前端儀表板輪詢此端點 |
-| `POST` | `/api/cards` | 新增一個監控卡片 | Body: `{ jobId, alias }` |
-| `PUT` | `/api/cards/:id` | 更新指定卡片內容（如別名） | Body: `{ alias }` |
+| `GET` | `/api/dashboard/data` | 取得所有監控卡片的最新快取建置資料 | 以 jobName 為 key 的物件 |
+| `GET` | `/api/dashboard/state` | **前端儀表板輪詢此端點**：一次取得 cards + 建置資料 + settings + `serverTime` | 單次往返，`serverTime` 供前端校正看板機時鐘偏移 |
+| `POST` | `/api/cards` | 新增一個監控卡片 | Body: `{ jobName }`；重複的 jobName 會回傳既有卡片 |
+| `PUT` | `/api/cards/:id` | 更新指定卡片內容（如別名） | Body: `{ alias }`；僅 `alias` 可被修改 |
 | `DELETE` | `/api/cards/:id` | 刪除指定卡片 | 需帶卡片 ID |
 | `PUT` | `/api/cards/reorder` | 批次更新所有卡片排序 | Body: `{ cardIds: [...] }` |
 | `GET` | `/api/settings` | 取得系統與顯示設定 | 同時作為 Docker Health Check 端點 |
-| `PUT` | `/api/settings` | 更新系統與顯示設定（如預設 grid） | Body: `{ grid }` |
+| `PUT` | `/api/settings` | 更新系統與顯示設定 | Body: `{ gridSize, autoRotateInterval }`；`gridSize` 僅接受 `3x3`/`4x4`/`5x5`，`autoRotateInterval` 限 5–600 秒，非法值會被忽略 |
 
 ---
 
@@ -228,7 +230,9 @@ d:\CICD_ROBOT\TestFarmDashBoard\
 3. 確認 Jenkins 帳號是否具備足夠的讀取權限 (Job Read)。
 
 ### Q2: 重啟 Docker 容器後，設定是否會遺失？
-不會。`docker-compose.yml` 已配置 Named Volume `dashboard_data` 掛載至容器內的 `/app/data` 目錄，所有新增卡片與設定均持久化儲存。
+不會。`docker-compose.yml` 以 Bind Mount 將專案目錄下的 `./data` 掛載至容器內的 `/app/data`，所有新增卡片與設定均持久化儲存於 `data/config.json`。設定檔採「先寫暫存檔再 rename」的原子寫入，程序若在寫入途中中斷也不會留下損毀的 JSON。
+
+> ⚠️ 若部署於 **Linux** 主機：容器以非 root 使用者 (uid 1001) 執行，而 bind mount 會沿用主機端目錄的擁有者。若 `./data` 為 root 所有，容器將無法寫入設定。請先執行 `sudo chown -R 1001:1001 ./data`，或改用 Named Volume。Windows / Docker Desktop 無此問題。
 
 ### Q3: 為什麼看板在平日晚上或週末停止更新？
 系統設計內建「工作時間偵測」（週一至週五 09:00 - 18:00）。非工作時間前端會自動暫停向後端輪詢並顯示休眠提示，此為預期省流行為。
@@ -239,6 +243,15 @@ d:\CICD_ROBOT\TestFarmDashBoard\
 docker exec -it test-farm-dashboard wget -qO- http://localhost:4000/api/settings
 ```
 並確認本機 4000 連接埠未被其他服務佔用。
+
+### Q5: 「最新完成」的閃爍卡片是怎麼判定的？可以調整時間嗎？
+- **判定方式**：比較所有卡片「最近一次**已完成**建置」的完成時間（Jenkins 的 `timestamp` 是**開始**時間，因此完成時間 = `timestamp + duration`），取其中最新的那一張。仍在執行中的建置不列入計算。
+- **持續時間**：完成後 8 小時內持續閃爍，超過即自動停止。想調整請修改 `public/js/dashboard.js` 最上方的：
+  ```js
+  const RECENT_HIGHLIGHT_MS = 8 * 60 * 60 * 1000;  // 8 小時
+  ```
+- **同時只會有一張卡片閃爍**（最新的那一筆）。若它落在其他頁面，工具列的「🆕 最新完成」標籤仍會顯示其名稱與完成時間。
+- 若作業系統開啟了「減少動態效果 / Reduce Motion」，閃爍會自動改為靜態的高亮外框。
 
 ---
 

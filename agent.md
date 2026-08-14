@@ -25,8 +25,13 @@ This document provides guidance for AI agents working on this project.
 1. Work hours check runs on the frontend (Mon-Fri 09:00-18:00 local time)
 2. Outside work hours: stop polling, show "Off Hours" overlay, keep last data visible
 3. Grid sizes: 3x3, 4x4, 5x5 — user switches via buttons in dashboard toolbar
-4. Pagination: cards exceeding grid capacity auto-paginate, 30-second auto-rotation
+4. Pagination: cards exceeding grid capacity auto-paginate, auto-rotation on
+   `settings.autoRotateInterval` (default 30s); skipped when there is only one page
 5. Theme: light/dark toggle, preference saved in localStorage
+6. Card DOM nodes are reused (keyed by `card.id`) — routine data refreshes update
+   text in place; the grid is only rebuilt on a page turn or grid-size change
+7. The most recently *finished* build across all cards pulses for 8 hours
+   (`RECENT_HIGHLIGHT_MS` in `dashboard.js`), with a mirrored chip in the toolbar
 
 ### Configuration Page (config.html)
 1. Jenkins connection: URL + username + password form with "Test Connection" button
@@ -36,9 +41,13 @@ This document provides guidance for AI agents working on this project.
 
 ### Dashboard Page (index.html)
 1. Read-only display — no editing capability
-2. Card shows: status color block, alias/job name, last success, last failure, last duration, 10-build trend chart
-3. Toolbar: grid size buttons, theme toggle, config page link, page indicator
+2. Card shows: status color block, alias/job name, last success, last failure,
+   last duration, node online/offline row, 10-build trend chart
+3. Toolbar: grid size buttons, page indicator, "newest finished" chip, date,
+   theme toggle, config page link, last-updated / stale-data indicator
 4. Auto-refreshes via polling (only during work hours)
+5. Never scrolls — the grid is pinned to `100vh` and cards drop their lower rows
+   through `@container` queries when space runs out
 
 ## File Naming Conventions
 - Backend: `server/*.js` (CommonJS modules)
@@ -65,7 +74,8 @@ This document provides guidance for AI agents working on this project.
 - Check data persistence: restart container, verify config survives
 
 ## Important Constraints
-- Port 4000 ONLY (never 8080 or 3000)
+- Port 4000 (never 8080 or 3000). `process.env.PORT` may override it for local
+  testing only — the default and the Docker port mapping stay 4000.
 - No npm dependencies for frontend (no React, Vue, Angular, Tailwind, etc.)
 - Only top-level Jenkins jobs (no recursive folder traversal)
 - Single global config (no per-user authentication or personalization)

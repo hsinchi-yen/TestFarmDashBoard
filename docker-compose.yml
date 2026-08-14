@@ -7,7 +7,7 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - dashboard_data:/app/data
+      - ./data:/app/data
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -17,7 +17,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  dashboard_data:
-    driver: local

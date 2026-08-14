@@ -1,16 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts are loaded via <link> in the HTML (non-blocking). Do not @import them
+   here as well - that costs a second request and blocks CSS parsing. */
 
 :root {
   /* Colors - use HSL for easy theming */
   --color-bg: hsl(220, 20%, 97%);
   --color-surface: hsl(0, 0%, 100%);
   --color-surface-hover: hsl(220, 20%, 95%);
+  --color-surface-translucent: rgba(255, 255, 255, 0.8);
   --color-text: hsl(220, 20%, 15%);
   --color-text-secondary: hsl(220, 10%, 45%);
   --color-border: hsl(220, 15%, 90%);
   --color-success: hsl(142, 71%, 45%);
   --color-failure: hsl(0, 84%, 60%);
   --color-building: hsl(45, 93%, 47%);
+  --color-unstable: hsl(38, 92%, 50%);
+  --color-aborted: hsl(220, 10%, 55%);
   --color-not-built: hsl(220, 10%, 65%);
   --color-primary: hsl(215, 90%, 52%);
   --color-primary-hover: hsl(215, 90%, 45%);
@@ -45,12 +49,15 @@
   --color-bg: hsl(220, 20%, 10%);
   --color-surface: hsl(220, 18%, 15%);
   --color-surface-hover: hsl(220, 18%, 20%);
+  --color-surface-translucent: rgba(30, 32, 36, 0.8);
   --color-text: hsl(220, 20%, 95%);
   --color-text-secondary: hsl(220, 10%, 70%);
   --color-border: hsl(220, 15%, 25%);
   --color-success: hsl(142, 60%, 45%);
   --color-failure: hsl(0, 70%, 60%);
   --color-building: hsl(45, 80%, 50%);
+  --color-unstable: hsl(38, 85%, 52%);
+  --color-aborted: hsl(220, 10%, 50%);
   --color-not-built: hsl(220, 10%, 45%);
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -138,7 +145,7 @@ body {
   left: 0;
   right: 0;
   height: 64px;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: var(--color-surface-translucent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-border);
@@ -150,25 +157,40 @@ body {
   transition: background-color var(--transition-normal), border-color var(--transition-normal);
 }
 
-[data-theme="dark"] .toolbar {
-  background-color: rgba(30, 32, 36, 0.8);
-}
-
 .toolbar__left, .toolbar__center, .toolbar__right {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
 }
 
+.toolbar__left {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .toolbar__center {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   justify-content: center;
+}
+
+.toolbar__right {
+  flex: 0 0 auto;
 }
 
 .toolbar__title {
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.current-date {
+  margin-right: var(--spacing-sm);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .toolbar__back {
@@ -219,38 +241,102 @@ body {
 .last-updated {
   font-size: 0.875rem;
   color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.last-updated--stale {
+  color: var(--color-failure);
+  font-weight: 600;
+}
+
+/* Mirrors the blinking card in the toolbar, so the newest finished test is
+   visible even while its page is not the one on screen. */
+.latest-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background-color: hsla(215, 90%, 52%, 0.12);
+  color: var(--color-primary);
+  border: 1px solid hsla(215, 90%, 52%, 0.35);
+  animation: chipPulse 1.8s ease-in-out infinite;
+}
+
+.latest-chip[data-result="success"] {
+  background-color: hsla(142, 71%, 45%, 0.14);
+  color: var(--color-success);
+  border-color: hsla(142, 71%, 45%, 0.4);
+}
+
+.latest-chip[data-result="failure"] {
+  background-color: hsla(0, 84%, 60%, 0.14);
+  color: var(--color-failure);
+  border-color: hsla(0, 84%, 60%, 0.4);
+}
+
+.latest-chip[data-result="unstable"] {
+  background-color: hsla(38, 92%, 50%, 0.14);
+  color: var(--color-unstable);
+  border-color: hsla(38, 92%, 50%, 0.4);
+}
+
+@keyframes chipPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
 }
 
 /* Dashboard */
+/* Fixed to the viewport: this is a wall display, it must never scroll. */
 .dashboard {
-  padding: calc(64px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg);
-  min-height: 100vh;
+  padding: calc(64px + var(--spacing-md)) var(--spacing-md) var(--spacing-md);
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .card-grid {
   display: grid;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   flex: 1;
-  /* Allow rows to fill the height */
-  grid-auto-rows: 1fr;
+  min-height: 0;
+  /* minmax(0, 1fr) - a plain 1fr refuses to shrink below the cards' min-content
+     height, which pushed the 4x4/5x5 grids off the bottom of the screen. */
+  grid-auto-rows: minmax(0, 1fr);
 }
 
-.grid-3x3 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
-.grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
-.grid-5x5 { grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); }
+.grid-3x3 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+.grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); }
+.grid-5x5 { grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); }
 
 /* Cards */
 .card {
+  --card-accent: var(--color-not-built);
+  /* Lets the card shed its least important rows when the grid gets dense,
+     instead of clipping them mid-line. See the @container rules below. */
+  container-type: size;
+  container-name: card;
+  position: relative;
   background-color: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  animation: fadeInUp 0.5s ease backwards;
+}
+
+/* Only applied when the grid is actually rebuilt (page turn / layout change),
+   so a routine 60s data refresh no longer re-animates the whole board. */
+.card--entering {
+  animation: fadeInUp 0.4s ease backwards;
 }
 
 .card:hover {
@@ -259,51 +345,108 @@ body {
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse {
-  0% { opacity: 1; box-shadow: var(--shadow-glow-building); }
-  50% { opacity: 0.7; box-shadow: 0 0 20px hsla(45, 93%, 47%, 0.8); }
-  100% { opacity: 1; box-shadow: var(--shadow-glow-building); }
+@keyframes barPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
 }
 
 .card__status-bar {
   height: 8px;
   width: 100%;
+  background-color: var(--card-accent);
   transition: background-color var(--transition-normal);
 }
 
-.card--success .card__status-bar { background-color: var(--color-success); }
-.card--failure .card__status-bar { background-color: var(--color-failure); }
-.card--building .card__status-bar { background-color: var(--color-building); animation: pulse 2s infinite; }
-.card--not-built .card__status-bar { background-color: var(--color-not-built); }
+.card--success  { --card-accent: var(--color-success); }
+.card--failure  { --card-accent: var(--color-failure); }
+.card--building { --card-accent: var(--color-building); }
+.card--unstable { --card-accent: var(--color-unstable); }
+.card--aborted  { --card-accent: var(--color-aborted); }
+.card--disabled { --card-accent: var(--color-not-built); }
+.card--not-built{ --card-accent: var(--color-not-built); }
 
-/* Offline Machine Styling */
+.card--building .card__status-bar { animation: barPulse 2s ease-in-out infinite; }
+
+/* Offline Machine Styling - inset shadow instead of a border so the card does
+   not change size (and reflow the grid) when a node goes offline. */
 .card--offline {
-  opacity: 0.6;
-  border: 2px solid var(--color-failure);
-  filter: grayscale(0.5);
+  opacity: 0.75;
+  box-shadow: var(--shadow-md), inset 0 0 0 2px var(--color-failure);
+  filter: grayscale(0.4);
 }
 
-.node-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  background-color: var(--color-border);
-  color: var(--color-text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-  margin-top: 4px;
+/* ---- Most recently finished test: highlighted for 8 hours ---------------- *
+ * A smooth glow pulse rather than a hard on/off blink - this sits on a wall
+ * display for up to 8 hours at a time. */
+@keyframes latestGlow {
+  0%, 100% {
+    box-shadow: var(--shadow-md), 0 0 0 2px var(--card-accent), 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: var(--shadow-lg), 0 0 0 3px var(--card-accent), 0 0 22px 4px var(--card-accent);
+  }
 }
 
-.node-badge--offline {
-  background-color: hsla(0, 84%, 60%, 0.15);
-  color: var(--color-failure);
-  font-weight: 600;
+@keyframes latestBadgeBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.96); }
+}
+
+.card--latest {
+  animation: latestGlow 1.6s ease-in-out infinite;
+  z-index: 1;
+}
+
+/* The entry animation and the glow cannot share the animation property, so the
+   glow takes over once the card has settled. */
+.card--latest.card--entering {
+  animation: fadeInUp 0.4s ease backwards, latestGlow 1.6s ease-in-out 0.4s infinite;
+}
+
+.card--latest .card__status-bar {
+  height: 10px;
+  animation: barPulse 1.6s ease-in-out infinite;
+}
+
+/* Outline chip rather than solid fill: white-on-amber had far too little
+   contrast for the BUILDING / UNSTABLE accents. */
+.card__latest-badge {
+  display: none;
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  color: var(--card-accent);
+  background-color: var(--color-bg);
+  border: 1.5px solid var(--card-accent);
+  animation: latestBadgeBlink 1.6s ease-in-out infinite;
+}
+
+.card--latest .card__latest-badge {
+  display: inline-block;
+}
+
+/* Wall displays run this for hours - honour the OS "reduce motion" setting. */
+@media (prefers-reduced-motion: reduce) {
+  .card--entering,
+  .card--latest,
+  .card--latest.card--entering,
+  .card--latest .card__status-bar,
+  .card--building .card__status-bar,
+  .card__latest-badge,
+  .latest-chip {
+    animation: none;
+  }
+  .card--latest {
+    box-shadow: var(--shadow-lg), 0 0 0 3px var(--card-accent);
+  }
 }
 
 .card__body {
@@ -336,25 +479,30 @@ body {
   font-size: 0.875rem;
 }
 
+.card__status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  min-height: 18px;
+}
+
 .card__status-label {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: var(--spacing-sm);
+  color: var(--card-accent);
 }
-
-.card--success .card__status-label { color: var(--color-success); }
-.card--failure .card__status-label { color: var(--color-failure); }
-.card--building .card__status-label { color: var(--color-building); }
-.card--not-built .card__status-label { color: var(--color-not-built); }
 
 .card__info {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -371,17 +519,80 @@ body {
 .card__info-item .value {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: var(--spacing-sm);
+}
+
+/* The node badge used to be absolutely positioned on top of the trend chart;
+   it now sits in its own row so it can never cover the bars. */
+.card__node-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-xs);
+}
+
+.card__node {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.card__node--offline {
+  color: var(--color-failure);
+  font-weight: 600;
 }
 
 .card__trend {
-  height: 50px;
+  height: 44px;
+  min-height: 28px;
   width: 100%;
   margin-top: auto;
+  flex: 0 0 auto;
 }
 
 .trend-canvas {
+  display: block;
   width: 100%;
   height: 100%;
+}
+
+/* ---- Adaptive card density -------------------------------------------- *
+ * A 4x4 grid on a 1080p panel gives each card ~230px; on a laptop window it is
+ * closer to 145px. Rather than clip the lower half of every card, drop the
+ * least important rows first as the available height shrinks. */
+@container card (max-height: 235px) {
+  .card__name { font-size: 1rem; }
+  .card__trend { height: 32px; }
+  .card__body { padding: var(--spacing-sm) var(--spacing-md); }
+}
+
+@container card (max-height: 195px) {
+  .card__trend { display: none; }
+  .card__info-item { font-size: 0.8125rem; }
+}
+
+@container card (max-height: 160px) {
+  .card__name { font-size: 0.9375rem; }
+  .card__node-row { display: none; }
+  .card__info { gap: 2px; }
+}
+
+@container card (max-height: 128px) {
+  /* Keep the two "last success / last failure" rows - they matter most */
+  .card__info-item--duration { display: none; }
+  .card__info-item { font-size: 0.75rem; }
+  .card__status-row { margin-bottom: 2px; }
+}
+
+@container card (max-height: 100px) {
+  .card__latest-badge { display: none !important; }
+  .card__info-item .label { font-size: 0.6875rem; }
 }
 
 /* Off-Hours Overlay */

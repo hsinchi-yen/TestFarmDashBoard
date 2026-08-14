@@ -11,37 +11,71 @@ const DEFAULT_CONFIG = {
   settings: { gridSize: "4x4", autoRotateInterval: 30 }
 };
 
+// The dashboard hits /api/cards and /api/settings once a minute per viewer, and
+// the poller reads the config for every tick. Keep the parsed config in memory
+// and only re-read when the file actually changed on disk.
+let cached = null;
+let cachedMtimeMs = 0;
+
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 }
 
-function getConfig() {
+function withDefaults(config) {
+  return {
+    jenkins: { ...DEFAULT_CONFIG.jenkins, ...(config.jenkins || {}) },
+    cards: Array.isArray(config.cards) ? config.cards : [],
+    settings: { ...DEFAULT_CONFIG.settings, ...(config.settings || {}) }
+  };
+}
+
+function readConfigFromDisk() {
   try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const data = fs.readFileSync(CONFIG_FILE, 'utf8');
-      return JSON.parse(data);
+    const stat = fs.statSync(CONFIG_FILE);
+    if (cached && stat.mtimeMs === cachedMtimeMs) {
+      return cached;
     }
+    const data = fs.readFileSync(CONFIG_FILE, 'utf8');
+    cached = withDefaults(JSON.parse(data));
+    cachedMtimeMs = stat.mtimeMs;
+    return cached;
   } catch (error) {
-    console.error('Error reading config file:', error);
+    if (error.code !== 'ENOENT') {
+      console.error('Error reading config file:', error.message);
+    }
   }
-  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  cached = null;
+  cachedMtimeMs = 0;
+  return withDefaults({});
+}
+
+function getConfig() {
+  // Hand out a copy so callers cannot mutate the cache by accident.
+  return JSON.parse(JSON.stringify(readConfigFromDisk()));
 }
 
 function saveConfig(config) {
   try {
     ensureDir();
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+    const normalized = withDefaults(config);
+    // Write to a temp file and rename so a crash mid-write cannot leave a
+    // truncated config.json behind.
+    const tmpFile = `${CONFIG_FILE}.tmp`;
+    fs.writeFileSync(tmpFile, JSON.stringify(normalized, null, 2), 'utf8');
+    fs.renameSync(tmpFile, CONFIG_FILE);
+    cached = normalized;
+    cachedMtimeMs = fs.statSync(CONFIG_FILE).mtimeMs;
     return true;
   } catch (error) {
-    console.error('Error saving config file:', error);
+    console.error('Error saving config file:', error.message);
     return false;
   }
 }
 
 function getJenkinsConfig() {
-  return getConfig().jenkins || DEFAULT_CONFIG.jenkins;
+  return getConfig().jenkins;
 }
 
 function saveJenkinsConfig({ url, username, password }) {
@@ -51,11 +85,15 @@ function saveJenkinsConfig({ url, username, password }) {
 }
 
 function getCards() {
-  return getConfig().cards || [];
+  return getConfig().cards;
 }
 
 function addCard({ jobName }) {
   const config = getConfig();
+  // Adding the same job twice would render two identical cards fed by one cache entry.
+  const existing = config.cards.find(c => c.jobName === jobName);
+  if (existing) return existing;
+
   const newCard = {
     id: uuidv4(),
     jobName,
@@ -69,49 +107,69 @@ function addCard({ jobName }) {
 
 function removeCard(id) {
   const config = getConfig();
+  const removed = config.cards.find(c => c.id === id) || null;
   config.cards = config.cards.filter(c => c.id !== id);
+  config.cards.forEach((c, i) => { c.order = i; });
   saveConfig(config);
+  return removed;
 }
+
+const EDITABLE_CARD_FIELDS = ['alias'];
 
 function updateCard(id, updates) {
   const config = getConfig();
   const cardIndex = config.cards.findIndex(c => c.id === id);
-  if (cardIndex !== -1) {
-    config.cards[cardIndex] = { ...config.cards[cardIndex], ...updates };
-    saveConfig(config);
-    return config.cards[cardIndex];
-  }
-  return null;
+  if (cardIndex === -1) return null;
+
+  // Only allow known fields through - a raw spread would let a request rewrite
+  // the card's id or jobName.
+  EDITABLE_CARD_FIELDS.forEach(field => {
+    if (updates[field] !== undefined) {
+      config.cards[cardIndex][field] = String(updates[field]).slice(0, 120);
+    }
+  });
+  saveConfig(config);
+  return config.cards[cardIndex];
 }
 
 function reorderCards(cardIds) {
   const config = getConfig();
   const newCards = [];
-  cardIds.forEach((id, index) => {
+  const seen = new Set();
+
+  cardIds.forEach((id) => {
+    if (seen.has(id)) return;
     const card = config.cards.find(c => c.id === id);
     if (card) {
-      card.order = index;
+      seen.add(id);
       newCards.push(card);
     }
   });
-  // Add remaining cards that were not in the array
+  // Append any cards that were not in the incoming list
   config.cards.forEach(c => {
-    if (!newCards.find(nc => nc.id === c.id)) {
-      c.order = newCards.length;
-      newCards.push(c);
-    }
+    if (!seen.has(c.id)) newCards.push(c);
   });
+
+  newCards.forEach((c, i) => { c.order = i; });
   config.cards = newCards;
   saveConfig(config);
 }
 
 function getSettings() {
-  return getConfig().settings || DEFAULT_CONFIG.settings;
+  return getConfig().settings;
 }
+
+const VALID_GRID_SIZES = ['3x3', '4x4', '5x5'];
 
 function updateSettings(settings) {
   const config = getConfig();
-  config.settings = { ...config.settings, ...settings };
+  if (VALID_GRID_SIZES.includes(settings.gridSize)) {
+    config.settings.gridSize = settings.gridSize;
+  }
+  const interval = Number(settings.autoRotateInterval);
+  if (Number.isFinite(interval) && interval >= 5 && interval <= 600) {
+    config.settings.autoRotateInterval = interval;
+  }
   saveConfig(config);
   return config.settings;
 }

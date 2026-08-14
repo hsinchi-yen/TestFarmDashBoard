@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TechNexion SoM - Board , Test Farm</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <!-- Loaded non-blocking: on an isolated lab network Google Fonts is unreachable
+       and a plain stylesheet link would stall first paint until it times out. -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
 </head>
 <body>
   <!-- Toolbar -->
@@ -22,9 +26,10 @@
       <div class="page-indicator">
         <span class="page-current">1</span> / <span class="page-total">1</span>
       </div>
+      <span id="latest-chip" class="latest-chip" style="display:none"></span>
     </div>
     <div class="toolbar__right">
-      <span id="current-date" class="current-date" style="margin-right: 16px; font-weight: 500;"></span>
+      <span id="current-date" class="current-date"></span>
       <button id="theme-toggle" class="icon-btn" title="切換主題">🌓</button>
       <a href="/config.html" class="icon-btn" title="設定">⚙️</a>
       <span class="last-updated"></span>
@@ -33,7 +38,7 @@
 
   <!-- Dashboard Grid -->
   <main class="dashboard">
-    <div id="card-grid" class="card-grid grid-3x3">
+    <div id="card-grid" class="card-grid grid-4x4">
       <!-- Cards dynamically inserted -->
     </div>
   </main>

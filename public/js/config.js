@@ -42,6 +42,10 @@ async function init() {
   
   dom.cancelDeleteBtn.addEventListener('click', () => closeDeleteModal());
   dom.confirmDeleteBtn.addEventListener('click', confirmDelete);
+  dom.deleteModal.querySelector('.modal__backdrop').addEventListener('click', closeDeleteModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && dom.deleteModal.style.display !== 'none') closeDeleteModal();
+  });
   
   await loadJenkinsConfig();
   await loadCards();
@@ -66,6 +70,17 @@ function toggleTheme() {
   }
 }
 
+// Jenkins job names may contain quotes, & or < - interpolating them straight
+// into innerHTML breaks the markup (and is an injection vector).
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function showToast(message, type = 'success') {
   dom.toast.textContent = message;
   dom.toast.className = `toast toast--${type} show`;
@@ -82,9 +97,8 @@ async function loadJenkinsConfig() {
       const config = await res.json();
       dom.url.value = config.url || '';
       dom.user.value = config.username || '';
-      if (config.hasPassword) {
-        dom.pass.placeholder = '已設定，若不修改請留空';
-      }
+      dom.pass.value = '';
+      dom.pass.placeholder = config.hasPassword ? '已設定，若不修改請留空' : '尚未設定密碼';
     }
   } catch (e) {
     console.error('Failed to load jenkins config', e);
@@ -302,10 +316,10 @@ function renderCards() {
     el.innerHTML = `
       <div class="manage-card__handle">⠿</div>
       <div class="manage-card__content">
-        <input type="text" class="manage-card__alias" value="${card.alias || card.jobName}" data-id="${card.id}">
-        <span class="manage-card__job">${card.jobName}</span>
+        <input type="text" class="manage-card__alias" value="${escapeHtml(card.alias || card.jobName)}" data-id="${escapeHtml(card.id)}" maxlength="120">
+        <span class="manage-card__job">${escapeHtml(card.jobName)}</span>
       </div>
-      <button class="icon-btn btn-delete" data-id="${card.id}" data-name="${card.jobName}">🗑️</button>
+      <button class="icon-btn btn-delete" data-id="${escapeHtml(card.id)}" title="移除">🗑️</button>
     `;
     
     // Drag events
@@ -314,9 +328,18 @@ function renderCards() {
     el.addEventListener('drop', handleDrop);
     el.addEventListener('dragend', handleDragEnd);
     
-    // Alias edit event
+    // Alias edit event - only save when the value actually changed, otherwise
+    // every click away triggers a PUT and a re-render that steals focus.
     const input = el.querySelector('.manage-card__alias');
-    input.addEventListener('blur', (e) => updateAlias(card.id, e.target.value));
+    const originalAlias = card.alias || card.jobName;
+    input.addEventListener('blur', (e) => {
+      const value = e.target.value.trim();
+      if (!value) {
+        e.target.value = originalAlias;
+        return;
+      }
+      if (value !== originalAlias) updateAlias(card.id, value);
+    });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         input.blur();
