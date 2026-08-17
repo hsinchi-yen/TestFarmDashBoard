@@ -315,6 +315,13 @@ body {
 .grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); }
 .grid-5x5 { grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); }
 
+/* The 3x3 wall view prioritizes the current test details over history bars. */
+.grid-3x3 .card__trend { display: none; }
+.grid-3x3 .card__info { display: flex; flex: 0 0 auto; overflow: visible; }
+.grid-3x3 .card--building .card__info { display: flex; }
+.grid-3x3 .card__info-item--duration { display: flex; }
+.grid-3x3 .card__node-row { display: none; }
+
 /* Cards */
 .card {
   --card-accent: var(--color-not-built);
@@ -496,6 +503,51 @@ body {
   color: var(--card-accent);
 }
 
+.card[data-activity="idle"] .card__status-label {
+  color: var(--color-text-secondary);
+}
+
+.card__console {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  margin: 0 0 var(--spacing-sm);
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-bg) 80%, var(--card-accent) 20%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.card__console[hidden] { display: none; }
+
+.card__console-prompt {
+  flex: 0 0 auto;
+  color: var(--card-accent);
+  font-weight: 700;
+}
+
+.card__console-text {
+  min-width: 0;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.card__console-result {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card__console[data-result="pass"] .card__console-result { color: var(--color-success); }
+.card__console[data-result="fail"] .card__console-result { color: var(--color-failure); }
+.card__console[data-result="skip"] .card__console-result { color: var(--color-unstable); }
+.card__console[data-result="not-run"] .card__console-result { color: var(--color-text-secondary); }
+
 .card__info {
   display: flex;
   flex-direction: column;
@@ -581,6 +633,8 @@ body {
   .card__name { font-size: 0.9375rem; }
   .card__node-row { display: none; }
   .card__info { gap: 2px; }
+  .card--building .card__info { display: none; }
+  .card__console { margin-bottom: 2px; padding-block: 2px; }
 }
 
 @container card (max-height: 128px) {

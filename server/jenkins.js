@@ -1,4 +1,8 @@
 const REQUEST_TIMEOUT_MS = 15000;
+const MAX_CONSOLE_TAIL_BYTES = 64 * 1024;
+const ANSI_ESCAPE_PATTERN = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+const CONSOLE_RESULT_PATTERN = /\|\s*(PASS|FAIL|SKIP|NOT RUN)\s*\|?\s*$/i;
+const STANDALONE_RESULT_PATTERN = /^\|\s*(PASS|FAIL|SKIP|NOT RUN)\s*\|?\s*$/i;
 
 function getAuthHeader(username, password) {
   if (!username || !password) return {};
@@ -14,11 +18,135 @@ function normalizeUrl(url) {
 
 // Every Jenkins call goes through here so a hung/unreachable controller can never
 // stall the polling loop forever.
-function jenkinsFetch(url, username, password) {
+function jenkinsFetch(url, username, password, options = {}) {
+  const { headers = {}, ...fetchOptions } = options;
   return fetch(url, {
-    headers: getAuthHeader(username, password),
+    ...fetchOptions,
+    headers: { ...getAuthHeader(username, password), ...headers },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
+}
+
+function cleanConsoleLine(line) {
+  return line.replace(ANSI_ESCAPE_PATTERN, '').trimEnd();
+}
+
+function getConsoleResult(line) {
+  const match = line.match(CONSOLE_RESULT_PATTERN);
+  return match ? match[1].toLowerCase().replace(/\s+/g, '-') : null;
+}
+
+function isStandaloneConsoleResult(line) {
+  return typeof line === 'string' && STANDALONE_RESULT_PATTERN.test(line.trim());
+}
+
+function isMeaningfulConsoleLine(line) {
+  const trimmed = line.trim();
+  return !!trimmed && !/^[\-=]{5,}$/.test(trimmed);
+}
+
+// Jenkins progressiveText can end halfway through a UTF-8/logical line. Keep
+// that fragment for the next request and only promote complete lines to the UI.
+function parseConsoleChunk(chunk, previous = {}) {
+  const combined = `${previous.fragment || ''}${chunk || ''}`;
+  const parts = combined.split(/\r?\n/);
+  const endsWithNewline = /(?:\r?\n)$/.test(combined);
+  const fragment = endsWithNewline ? '' : (parts.pop() || '');
+  const lines = parts.map(cleanConsoleLine).filter(isMeaningfulConsoleLine);
+
+  const latestResultLine = [...lines].reverse().find(line => getConsoleResult(line));
+  const fallbackLine = [...lines].reverse().find(isMeaningfulConsoleLine);
+  const standaloneResult = isStandaloneConsoleResult(latestResultLine);
+  let text = latestResultLine || previous.text || fallbackLine || '';
+
+  // Robot Framework can emit the TEST CASE description and its final status in
+  // separate progressiveText chunks. Do not let a bare "| PASS |" replace the
+  // description that was already cached.
+  if (standaloneResult && previous.text) {
+    text = getConsoleResult(previous.text)
+      ? previous.text
+      : `${previous.text.trimEnd()} ${latestResultLine.trim()}`;
+  }
+
+  return {
+    text,
+    result: latestResultLine ? getConsoleResult(latestResultLine) : (previous.result || null),
+    fragment,
+    standaloneResult
+  };
+}
+
+async function fetchConsoleStatus(jenkinsConfig, jobName, buildNumber, previous = {}) {
+  const { username, password } = jenkinsConfig;
+  const base = normalizeUrl(jenkinsConfig.url);
+  if (!base || !jobName || !buildNumber) return null;
+
+  const encodedJobName = encodeURIComponent(jobName);
+  const consoleUrl = `${base}/job/${encodedJobName}/${buildNumber}/logText/progressiveText`;
+  const sameBuild = previous.buildNumber === buildNumber;
+  let start = sameBuild && Number.isFinite(previous.offset) ? previous.offset : null;
+
+  // On first sight of a build, use Jenkins' size header to cap the initial read.
+  // Subsequent calls continue exactly at X-Text-Size and only fetch new output.
+  if (start === null) {
+    try {
+      const head = await jenkinsFetch(`${consoleUrl}?start=0`, username, password, { method: 'HEAD' });
+      const size = Number(head.headers.get('x-text-size'));
+      start = Number.isFinite(size) ? Math.max(0, size - MAX_CONSOLE_TAIL_BYTES) : 0;
+    } catch (error) {
+      start = 0;
+    }
+  }
+
+  let response = await jenkinsFetch(`${consoleUrl}?start=${start}`, username, password);
+  // Jenkins may reject an offset after a log rotation. Restart safely if so.
+  if (response.status === 416 && start !== 0) {
+    start = 0;
+    response = await jenkinsFetch(`${consoleUrl}?start=0`, username, password);
+  }
+  if (!response.ok) {
+    throw new Error(`Console fetch failed with status ${response.status}`);
+  }
+
+  const chunk = await response.text();
+  let parsed = parseConsoleChunk(chunk, sameBuild ? previous : {});
+  const headerOffset = Number(response.headers.get('x-text-size'));
+  let offset = Number.isFinite(headerOffset)
+    ? headerOffset
+    : start + Buffer.byteLength(chunk, 'utf8');
+
+  // If Jenkins only returned the trailing result token, re-read the bounded
+  // tail. Jenkins' consolidated text contains the description and result on
+  // one line, so this recovers the exact TEST CASE without downloading a large
+  // log or guessing which earlier cached line it belongs to.
+  if (parsed.standaloneResult) {
+    const recoveryStart = Math.max(0, offset - MAX_CONSOLE_TAIL_BYTES);
+    const recoveryResponse = await jenkinsFetch(
+      `${consoleUrl}?start=${recoveryStart}`,
+      username,
+      password
+    );
+    if (recoveryResponse.ok) {
+      const recoveryChunk = await recoveryResponse.text();
+      const recovered = parseConsoleChunk(recoveryChunk);
+      if (recovered.text && !recovered.standaloneResult) {
+        parsed = recovered;
+        const recoveryOffset = Number(recoveryResponse.headers.get('x-text-size'));
+        offset = Number.isFinite(recoveryOffset)
+          ? recoveryOffset
+          : recoveryStart + Buffer.byteLength(recoveryChunk, 'utf8');
+      }
+    }
+  }
+
+  return {
+    buildNumber,
+    offset,
+    fragment: parsed.fragment,
+    text: parsed.text,
+    result: parsed.result,
+    updatedAt: Date.now()
+  };
 }
 
 async function testConnection(url, username, password) {
@@ -123,5 +251,7 @@ module.exports = {
   fetchAllJobs,
   fetchJobDetail,
   fetchNodesStatus,
+  fetchConsoleStatus,
+  parseConsoleChunk,
   normalizeUrl
 };

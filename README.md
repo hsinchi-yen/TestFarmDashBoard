@@ -6,9 +6,10 @@
 
 ## 🌟 核心特色 (Features)
 
-- **即時狀態卡片監控**：直觀色塊呈現建置狀態（綠色：SUCCESS、紅色：FAILURE、黃色閃爍：BUILDING、琥珀色：UNSTABLE、灰色：ABORTED / DISABLED / NOT BUILT）。
+- **即時狀態卡片監控**：狀態文字以 `BUILDING` / `IDLE` 清楚區分是否正在執行，色條則保留最近建置結果（綠色：SUCCESS、紅色：FAILURE、琥珀色：UNSTABLE、灰色：ABORTED / DISABLED / NOT BUILT）。
+- **執行中 Console 摘要**：Build 執行時每 5 秒透過 Jenkins `progressiveText` API 漸進抓取新增 log，卡片在 `BUILDING` 下方完整換行顯示最新 Robot Framework TEST CASE，並固定保留 `PASS` / `FAIL` / `SKIP` / `NOT RUN` 結果標籤；進入 `IDLE` 後自動隱藏。
 - **最新完成測試閃爍提示**：所有卡片中「最近一筆完成」的測試，會在完成後的 **8 小時內**持續以光暈脈動閃爍，並加上「🆕 剛完成」標籤；工具列同步顯示對應的提示標籤，即使該卡片目前不在顯示中的頁面也不會錯過。
-- **靈活網格佈局**：支援 `3x3`、`4x4`、`5x5` 網格維度即時切換，適配各類螢幕與電視牆顯示。畫面固定為一個視窗高度、永不出現捲軸；空間不足時卡片會依序自動收起次要資訊列。
+- **靈活網格佈局**：支援 `3x3`、`4x4`、`5x5` 網格維度即時切換，適配各類螢幕與電視牆顯示。畫面固定為一個視窗高度、永不出現捲軸；`3x3` 模式隱藏建置趨勢色條並優先顯示「上次費時」，其他模式則依空間自動收起次要資訊列。
 - **自動分頁輪播**：當監控卡片數量超出當前網格容量時，自動進行平滑換頁輪播（預設 30 秒，可由 `settings.autoRotateInterval` 調整）；只有一頁時不輪播。
 - **建置趨勢圖表**：每張卡片皆內嵌基於 HTML5 Canvas 的最近 10 次建置趨勢圖，無需依賴肥大第三方圖表庫。
 - **自訂別名與拖曳排序**：支援在設定頁面以 HTML5 原生拖曳 API 調整卡片順序，並可即時編輯自訂別名 (Alias)。
@@ -172,18 +173,18 @@ flowchart TD
         JenkinsAPI["Jenkins Remote JSON API\n(http://10.88.95.1:8080)"]
     end
 
-    UI -->|每 60 秒輪詢 (工作時間)| Server
+    UI -->|每 5 秒讀取快取 (工作時間)| Server
     UI -.->|超出工作時間| WorkHours
     Server -->|讀取快取| MemCache
     Server -->|讀寫組態| Store
-    Scheduler -->|每 60 秒定期抓取| JenkinsAPI
+    Scheduler -->|Job 每 60 秒 / Console 每 5 秒| JenkinsAPI
     Scheduler -->|更新快取| MemCache
     Store -.->|持久化掛載| DockerVolume[(Docker Volume:\ndashboard_data)]
 ```
 
 ### 架構設計亮點
 1. **API 隔離與安全代理**：前端完全不直連 Jenkins，所有連線由後端 Express 代理，防止 Jenkins 憑證暴露於客戶端。
-2. **記憶體快取與負載緩解**：後端 Scheduler 每 60 秒主動同步 Jenkins 狀態並寫入記憶體快取。前端瀏覽器請求直接讀取記憶體，即便數十台電視牆同時開啟看板，也不會對 Jenkins 造成額外負載。
+2. **記憶體快取與負載緩解**：後端 Scheduler 每 60 秒同步 Jenkins Job 狀態；只有執行中的 Build 會每 5 秒漸進讀取新增 console 內容，首次最多載入最後 64 KB。前端瀏覽器每 5 秒直接讀取伺服器快取，不會因電視牆數量增加而對 Jenkins 產生等比例負載。
 3. **無依賴前端**：不使用 React/Vue/Webpack 等構建工具，原生 JavaScript、CSS Custom Properties 與 HTML5 Canvas，體積輕巧、載入極速。
 4. **單一儲存結構**：所有卡片與連線設定以結構化 JSON 保存在 `data/config.json`，透過 Docker Volume `dashboard_data` 實現跨重啟持久化。
 

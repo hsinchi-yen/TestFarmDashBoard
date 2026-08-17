@@ -1,10 +1,14 @@
 const POLL_INTERVAL_MS = 60000;
+const CONSOLE_POLL_INTERVAL_MS = 5000;
 const MAX_CONCURRENT_JOBS = 5;
 
 let cache = {};
 let pollingInterval = null;
+let consolePollingInterval = null;
 let pollInFlight = false;
+let consolePollInFlight = false;
 let lastPollAt = null;
+const consoleStates = new Map();
 
 // Run `worker` over `items` with a bounded number of in-flight requests, so a
 // board with 25 cards does not fire 25 simultaneous requests at Jenkins, nor
@@ -66,6 +70,13 @@ async function pollOnce(store, jenkins) {
           detail.nodeOffline = false;
         }
 
+        const previous = cache[jobName];
+        if (detail.lastBuild && detail.lastBuild.building &&
+            previous && previous.lastBuild &&
+            previous.lastBuild.number === detail.lastBuild.number &&
+            previous.consoleStatus) {
+          detail.consoleStatus = previous.consoleStatus;
+        }
         cache[jobName] = detail;
       } catch (err) {
         console.error(`Error polling job ${jobName}:`, err.message);
@@ -83,10 +94,66 @@ async function pollOnce(store, jenkins) {
   }
 }
 
+async function pollConsoleOnce(store, jenkins) {
+  if (consolePollInFlight) return;
+
+  const jenkinsConfig = store.getJenkinsConfig();
+  if (!jenkinsConfig.url) return;
+
+  const buildingJobs = Object.entries(cache).filter(([, detail]) =>
+    detail && detail.lastBuild && detail.lastBuild.building
+  );
+  const activeJobs = new Set(buildingJobs.map(([jobName]) => jobName));
+
+  // Clear console state as soon as the normal poll observes completion/removal.
+  for (const jobName of consoleStates.keys()) {
+    if (!activeJobs.has(jobName)) consoleStates.delete(jobName);
+  }
+  Object.entries(cache).forEach(([jobName, detail]) => {
+    if (!activeJobs.has(jobName) && detail) delete detail.consoleStatus;
+  });
+  if (!buildingJobs.length) return;
+
+  consolePollInFlight = true;
+  try {
+    await mapWithConcurrency(buildingJobs, MAX_CONCURRENT_JOBS, async ([jobName, detail]) => {
+      const buildNumber = detail.lastBuild.number;
+      const previous = consoleStates.get(jobName) || {};
+      try {
+        const next = await jenkins.fetchConsoleStatus(
+          jenkinsConfig,
+          jobName,
+          buildNumber,
+          previous
+        );
+        if (!next) return;
+
+        consoleStates.set(jobName, next);
+        const current = cache[jobName];
+        if (current && current.lastBuild &&
+            current.lastBuild.building && current.lastBuild.number === buildNumber) {
+          current.consoleStatus = next.text ? {
+            text: next.text,
+            result: next.result,
+            updatedAt: next.updatedAt
+          } : null;
+        }
+      } catch (err) {
+        console.error(`Error polling console for ${jobName}:`, err.message);
+      }
+    });
+  } finally {
+    consolePollInFlight = false;
+  }
+}
+
 function pruneCache(validJobNames) {
   const keep = new Set(validJobNames);
   Object.keys(cache).forEach(jobName => {
-    if (!keep.has(jobName)) delete cache[jobName];
+    if (!keep.has(jobName)) {
+      delete cache[jobName];
+      consoleStates.delete(jobName);
+    }
   });
 }
 
@@ -94,19 +161,33 @@ function startPolling(store, jenkins) {
   if (pollingInterval) {
     clearInterval(pollingInterval);
   }
+  if (consolePollingInterval) {
+    clearInterval(consolePollingInterval);
+  }
+  consoleStates.clear();
 
   // Initial poll
-  pollOnce(store, jenkins).catch(err => console.error('Initial poll failed:', err));
+  pollOnce(store, jenkins)
+    .then(() => pollConsoleOnce(store, jenkins))
+    .catch(err => console.error('Initial poll failed:', err));
 
   pollingInterval = setInterval(() => {
     pollOnce(store, jenkins).catch(err => console.error('Poll failed:', err));
   }, POLL_INTERVAL_MS);
+
+  consolePollingInterval = setInterval(() => {
+    pollConsoleOnce(store, jenkins).catch(err => console.error('Console poll failed:', err));
+  }, CONSOLE_POLL_INTERVAL_MS);
 }
 
 function stopPolling() {
   if (pollingInterval) {
     clearInterval(pollingInterval);
     pollingInterval = null;
+  }
+  if (consolePollingInterval) {
+    clearInterval(consolePollingInterval);
+    consolePollingInterval = null;
   }
 }
 
@@ -119,7 +200,10 @@ function setCachedJob(jobName, detail) {
 }
 
 function removeCachedJob(jobName) {
-  if (jobName) delete cache[jobName];
+  if (jobName) {
+    delete cache[jobName];
+    consoleStates.delete(jobName);
+  }
 }
 
 function getLastPollAt() {

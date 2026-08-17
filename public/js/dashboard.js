@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', init);
 /* ------------------------------------------------------------------ *
  * Constants
  * ------------------------------------------------------------------ */
-const DATA_REFRESH_MS = 60000;      // how often we pull the server cache
+const DATA_REFRESH_MS = 5000;       // keep live console text responsive while builds run
 const TICK_MS = 30000;              // refresh of relative times / highlight state
 const IDLE_RESUME_MS = 60000;       // resume auto-rotation this long after user input
 const DEFAULT_ROTATE_SEC = 30;
@@ -193,6 +193,18 @@ async function fetchDashboardData() {
 
     if (state.serverTime) clockOffset = state.serverTime - Date.now();
     lastPollAt = state.lastPollAt || null;
+    let gridChanged = false;
+    if (state.settings && state.settings.gridSize) {
+      gridChanged = settings.gridSize !== state.settings.gridSize;
+      settings.gridSize = state.settings.gridSize;
+      if (gridChanged) {
+        dom.gridBtns.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.grid === settings.gridSize);
+        });
+        dom.grid.className = `card-grid grid-${settings.gridSize}`;
+        currentPage = 1;
+      }
+    }
     if (state.settings && state.settings.autoRotateInterval) {
       const changed = settings.autoRotateInterval !== state.settings.autoRotateInterval;
       settings.autoRotateInterval = state.settings.autoRotateInterval;
@@ -205,8 +217,9 @@ async function fetchDashboardData() {
 
     computeLatestFinished();
     // Card set changed (added/removed/reordered) -> the grid needs new nodes
-    const rebuild = previousIds !== allCards.map(c => c.id).join('|');
+    const rebuild = gridChanged || previousIds !== allCards.map(c => c.id).join('|');
     renderPage(currentPage, { rebuild });
+    if (gridChanged) startRotation();
     updateFreshnessLabel();
   } catch (e) {
     console.error('Error fetching dashboard data', e);
@@ -358,6 +371,11 @@ function createCardNode(card) {
         <span class="card__status-label"></span>
         <span class="card__latest-badge">🆕 剛完成</span>
       </div>
+      <div class="card__console" data-ref="console" hidden>
+        <span class="card__console-prompt">&gt;_</span>
+        <span class="card__console-text"></span>
+        <span class="card__console-result"></span>
+      </div>
       <div class="card__info">
         <div class="card__info-item">
           <span class="label">✅ 上次成功</span>
@@ -387,6 +405,9 @@ function createCardNode(card) {
     name: el.querySelector('.card__name'),
     buildNumber: el.querySelector('.card__build-number'),
     statusLabel: el.querySelector('.card__status-label'),
+    console: el.querySelector('[data-ref="console"]'),
+    consoleText: el.querySelector('.card__console-text'),
+    consoleResult: el.querySelector('.card__console-result'),
     success: el.querySelector('[data-ref="success"]'),
     failure: el.querySelector('[data-ref="failure"]'),
     duration: el.querySelector('[data-ref="duration"]'),
@@ -405,6 +426,7 @@ function updateCardNode(node, card) {
     (highlighted ? ' card--latest' : '') +
     (node.el.classList.contains('card--entering') ? ' card--entering' : '');
   node.el.dataset.id = card.id;
+  node.el.dataset.activity = isBuildRunning(card) ? 'building' : 'idle';
 
   const displayName = card.alias || card.jobName || '(未命名)';
   setText(node.name, displayName);
@@ -412,6 +434,20 @@ function updateCardNode(node, card) {
 
   setText(node.buildNumber, card.lastBuild ? `#${card.lastBuild.number}` : '#-');
   setText(node.statusLabel, getStatusLabel(card));
+
+  const consoleStatus = isBuildRunning(card) && card.consoleStatus;
+  const consoleText = consoleStatus && consoleStatus.text ? consoleStatus.text : '';
+  const resultMatch = consoleText.match(/\|\s*(PASS|FAIL|SKIP|NOT RUN)\s*\|?\s*$/i);
+  const consoleMessage = resultMatch
+    ? consoleText.slice(0, resultMatch.index).trimEnd()
+    : consoleText;
+  const consoleResult = resultMatch ? `| ${resultMatch[1].toUpperCase()} |` : '';
+  node.console.hidden = !consoleText;
+  node.console.dataset.result = consoleStatus && consoleStatus.result ? consoleStatus.result : '';
+  setText(node.consoleText, consoleMessage);
+  setText(node.consoleResult, consoleResult);
+  node.consoleResult.hidden = !consoleResult;
+  node.console.title = consoleText;
 
   setText(node.success, card.lastSuccessful
     ? `#${card.lastSuccessful.number} (${formatRelativeTime(card.lastSuccessful.timestamp)})`
@@ -459,18 +495,12 @@ function getStatusClass(card) {
   return 'not-built';
 }
 
-const STATUS_LABELS = {
-  'success': 'SUCCESS',
-  'failure': 'FAILURE',
-  'building': 'BUILDING',
-  'unstable': 'UNSTABLE',
-  'aborted': 'ABORTED',
-  'disabled': 'DISABLED',
-  'not-built': 'NOT BUILT'
-};
+function isBuildRunning(card) {
+  return !!(card.lastBuild && card.lastBuild.building);
+}
 
 function getStatusLabel(card) {
-  return STATUS_LABELS[getStatusClass(card)] || 'NOT BUILT';
+  return isBuildRunning(card) ? 'BUILDING' : 'IDLE';
 }
 
 /* ------------------------------------------------------------------ *
