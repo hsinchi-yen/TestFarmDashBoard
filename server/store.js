@@ -70,7 +70,7 @@ function saveConfig(config) {
     return true;
   } catch (error) {
     console.error('Error saving config file:', error.message);
-    return false;
+    throw error;
   }
 }
 

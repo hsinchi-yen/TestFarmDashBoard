@@ -25,9 +25,10 @@ VOLUME ["/app/data"]
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:4000/api/settings || exit 1
 
-# Run as non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+# The official Node image already provides node:node as UID/GID 1000:1000.
+# Keep that identity so bind-mounted production data owned by 1000:1000 remains
+# writable while the application still runs without root privileges.
+RUN chown -R node:node /app
+USER node
 
 CMD ["node", "server/index.js"]
