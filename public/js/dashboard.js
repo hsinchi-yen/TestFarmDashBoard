@@ -10,10 +10,6 @@ const DEFAULT_ROTATE_SEC = 30;
 const RECENT_HIGHLIGHT_MS = 8 * 60 * 60 * 1000;  // blink the newest finished test for 8h
 const STALE_DATA_MS = 5 * 60 * 1000;             // warn when the poller stops updating
 
-const WORK_DAYS = [1, 2, 3, 4, 5];
-const WORK_START_HOUR = 9;
-const WORK_END_HOUR = 18;
-
 /* ------------------------------------------------------------------ *
  * State
  * ------------------------------------------------------------------ */
@@ -42,8 +38,6 @@ const dom = {
   pageTotal: document.querySelector('.page-total'),
   lastUpdated: document.querySelector('.last-updated'),
   themeToggle: document.getElementById('theme-toggle'),
-  offHoursOverlay: document.getElementById('off-hours-overlay'),
-  offHoursTime: document.querySelector('.off-hours-time'),
   currentDate: document.getElementById('current-date'),
   latestChip: document.getElementById('latest-chip')
 };
@@ -74,27 +68,14 @@ async function init() {
 
   updateDateDisplay();
   tickInterval = setInterval(tick, TICK_MS);
-  setInterval(checkWorkHours, 60000);
-
-  if (isWorkHours()) {
-    await startLiveMode();
-  } else {
-    showOffHours();
-  }
+  await startLiveMode();
 }
 
 async function startLiveMode() {
-  dom.offHoursOverlay.style.display = 'none';
   await fetchDashboardData();
   clearInterval(dataInterval);
   dataInterval = setInterval(fetchDashboardData, DATA_REFRESH_MS);
   startRotation();
-}
-
-function stopLiveMode() {
-  clearInterval(dataInterval);
-  dataInterval = null;
-  stopRotation();
 }
 
 /* ------------------------------------------------------------------ *
@@ -155,31 +136,6 @@ function applyGridSize(size, { persist = true } = {}) {
 function getPageSize() {
   const [cols, rows] = settings.gridSize.split('x').map(Number);
   return (cols || 4) * (rows || 4);
-}
-
-/* ------------------------------------------------------------------ *
- * Work hours
- * ------------------------------------------------------------------ */
-function isWorkHours() {
-  const d = new Date(now());
-  return WORK_DAYS.includes(d.getDay()) && d.getHours() >= WORK_START_HOUR && d.getHours() < WORK_END_HOUR;
-}
-
-function checkWorkHours() {
-  const working = isWorkHours();
-  const overlayVisible = dom.offHoursOverlay.style.display !== 'none';
-
-  if (working && overlayVisible) {
-    startLiveMode();
-  } else if (!working) {
-    if (!overlayVisible) stopLiveMode();
-    showOffHours();
-  }
-}
-
-function showOffHours() {
-  dom.offHoursOverlay.style.display = 'flex';
-  dom.offHoursTime.textContent = new Date(now()).toLocaleTimeString('zh-TW');
 }
 
 /* ------------------------------------------------------------------ *
@@ -628,7 +584,7 @@ function onUserActivity() {
     stopRotation();
     clearTimeout(rotationTimeout);
     rotationTimeout = setTimeout(() => {
-      if (isWorkHours()) startRotation();
+      startRotation();
     }, IDLE_RESUME_MS);
   });
 }
@@ -640,7 +596,7 @@ function onWindowResize() {
 
 // A hidden tab throttles timers; refresh immediately when it comes back
 function onVisibilityChange() {
-  if (document.visibilityState === 'visible' && isWorkHours()) {
+  if (document.visibilityState === 'visible') {
     fetchDashboardData();
   }
 }
@@ -649,11 +605,6 @@ function onVisibilityChange() {
 function tick() {
   updateDateDisplay();
   if (document.visibilityState !== 'visible') return;
-
-  if (!isWorkHours()) {
-    showOffHours();
-    return;
-  }
   computeLatestFinished();
   const pageSize = getPageSize();
   const start = (currentPage - 1) * pageSize;

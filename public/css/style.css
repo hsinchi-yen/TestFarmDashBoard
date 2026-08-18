@@ -649,45 +649,6 @@ body {
   .card__info-item .label { font-size: 0.6875rem; }
 }
 
-/* Off-Hours Overlay */
-.off-hours-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.off-hours-content {
-  text-align: center;
-  animation: fadeInUp 0.5s ease;
-}
-
-.off-hours-icon {
-  font-size: 4rem;
-  margin-bottom: var(--spacing-md);
-}
-
-.off-hours-content h2 {
-  font-size: 2rem;
-  margin-bottom: var(--spacing-sm);
-}
-
-.off-hours-time {
-  font-size: 1.25rem;
-  font-weight: 300;
-  margin-top: var(--spacing-lg);
-  font-family: 'JetBrains Mono', monospace;
-}
-
 /* Config Page */
 .config-page {
   padding: calc(64px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg);

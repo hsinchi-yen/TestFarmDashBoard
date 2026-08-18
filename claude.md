@@ -29,7 +29,7 @@ A Dockerized web dashboard for monitoring Jenkins test build statuses in real-ti
 - Last 10 builds trend chart per card (right-aligned, DPR-aware, theme-coloured)
 - Card alias customization, drag-and-drop reorder (config page only)
 - Light/dark theme toggle
-- Work hours only (Mon-Fri 9:00-18:00): frontend stops polling and shows overlay outside work hours
+- Around-the-clock dashboard polling with an immediate refresh when the tab becomes visible
 - Stale-data warning in the toolbar when the backend poll has not succeeded for 5 minutes
 
 ## Project Structure

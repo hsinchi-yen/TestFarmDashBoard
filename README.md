@@ -13,7 +13,7 @@
 - **自動分頁輪播**：當監控卡片數量超出當前網格容量時，自動進行平滑換頁輪播（預設 30 秒，可由 `settings.autoRotateInterval` 調整）；只有一頁時不輪播。
 - **建置趨勢圖表**：每張卡片皆內嵌基於 HTML5 Canvas 的最近 10 次建置趨勢圖，無需依賴肥大第三方圖表庫。
 - **自訂別名與拖曳排序**：支援在設定頁面以 HTML5 原生拖曳 API 調整卡片順序，並可即時編輯自訂別名 (Alias)。
-- **工作時間智慧省流**：前端自動判斷工作時間（週一至週五 09:00 - 18:00），非工作時間自動停止輪詢並顯示「Off Hours」休眠提示層，節省伺服器與網路資源。
+- **全天候狀態監控**：前端全天每 5 秒讀取最新快取，隨時顯示卡片的 IDLE / BUILDING 狀態與執行中的 Console 內容。
 - **深淺色主題切換**：內建 Light / Dark 主題模式，使用者偏好自動儲存於 `localStorage`。
 - **全域組態與資料持久化**：單一全域 JSON 設定檔 (`/app/data/config.json`)，透過 Docker Volume 實現重啟後設定不遺失。
 - **安全代理機制**：後端隔離 Jenkins 憑證，密碼遮罩傳輸，前端不直連 Jenkins。
@@ -159,7 +159,6 @@ npm start
 flowchart TD
     subgraph Browser ["客戶端瀏覽器 (Frontend)"]
         UI["Vanilla HTML/CSS/JS\n(index.html / config.html)"]
-        WorkHours{"工作時間判定\n(Mon-Fri 09:00-18:00)"}
     end
 
     subgraph Container ["Docker 容器 (Port: 4000)"]
@@ -173,8 +172,7 @@ flowchart TD
         JenkinsAPI["Jenkins Remote JSON API\n(http://10.88.95.1:8080)"]
     end
 
-    UI -->|每 5 秒讀取快取 (工作時間)| Server
-    UI -.->|超出工作時間| WorkHours
+    UI -->|全天每 5 秒讀取快取| Server
     Server -->|讀取快取| MemCache
     Server -->|讀寫組態| Store
     Scheduler -->|Job 每 60 秒 / Console 每 5 秒| JenkinsAPI
@@ -235,8 +233,8 @@ d:\CICD_ROBOT\TestFarmDashBoard\
 
 > ⚠️ 若部署於 **Linux** 主機：容器以非 root 使用者 (uid 1001) 執行，而 bind mount 會沿用主機端目錄的擁有者。若 `./data` 為 root 所有，容器將無法寫入設定。請先執行 `sudo chown -R 1001:1001 ./data`，或改用 Named Volume。Windows / Docker Desktop 無此問題。
 
-### Q3: 為什麼看板在平日晚上或週末停止更新？
-系統設計內建「工作時間偵測」（週一至週五 09:00 - 18:00）。非工作時間前端會自動暫停向後端輪詢並顯示休眠提示，此為預期省流行為。
+### Q3: 看板是否會在平日晚上或週末更新？
+會。看板全天候顯示卡片狀態，前端每 5 秒讀取後端快取；瀏覽器頁籤從背景恢復時也會立即刷新。
 
 ### Q4: 容器 Health Check 失敗 (unhealthy)？
 可檢查容器內部 `/api/settings` 是否正常回應：
