@@ -7,13 +7,13 @@
 ## 🌟 核心特色 (Features)
 
 - **即時狀態卡片監控**：狀態文字以 `BUILDING` / `IDLE` 清楚區分是否正在執行，色條則保留最近建置結果（綠色：SUCCESS、紅色：FAILURE、琥珀色：UNSTABLE、灰色：ABORTED / DISABLED / NOT BUILT）。
-- **執行中 Console 摘要**：Build 執行時每 5 秒透過 Jenkins `progressiveText` API 漸進抓取新增 log，卡片在 `BUILDING` 下方完整換行顯示最新 Robot Framework TEST CASE，並固定保留 `PASS` / `FAIL` / `SKIP` / `NOT RUN` 結果標籤；進入 `IDLE` 後自動隱藏。
+- **執行中 Console 摘要**：Build 執行時每 10 秒透過 Jenkins `progressiveText` API 漸進抓取新增 log，卡片在 `BUILDING` 下方完整換行顯示最新 Robot Framework TEST CASE，並固定保留 `PASS` / `FAIL` / `SKIP` / `NOT RUN` 結果標籤；進入 `IDLE` 後自動隱藏。
 - **最新完成測試閃爍提示**：所有卡片中「最近一筆完成」的測試，會在完成後的 **8 小時內**持續以光暈脈動閃爍，並加上「🆕 剛完成」標籤；工具列同步顯示對應的提示標籤，即使該卡片目前不在顯示中的頁面也不會錯過。
 - **靈活網格佈局**：支援 `3x3`、`4x4`、`5x5` 網格維度即時切換，並將選擇保存在目前瀏覽器，重新整理及背景資料輪詢都不會改回其他尺寸。畫面固定為一個視窗高度、永不出現捲軸；`3x3` 模式隱藏建置趨勢色條並優先顯示「上次費時」，其他模式則依空間自動收起次要資訊列。
 - **自動分頁輪播**：當監控卡片數量超出當前網格容量時，自動進行平滑換頁輪播（預設 30 秒，可由 `settings.autoRotateInterval` 調整）；只有一頁時不輪播。
 - **建置趨勢圖表**：每張卡片皆內嵌基於 HTML5 Canvas 的最近 10 次建置趨勢圖，無需依賴肥大第三方圖表庫。
 - **自訂別名與拖曳排序**：支援在設定頁面以 HTML5 原生拖曳 API 調整卡片順序，並可即時編輯自訂別名 (Alias)。
-- **全天候狀態監控**：前端全天每 5 秒讀取最新快取，隨時顯示卡片的 IDLE / BUILDING 狀態與執行中的 Console 內容。
+- **全天候狀態監控**：前端全天每 10 秒讀取最新快取，隨時顯示卡片的 IDLE / BUILDING 狀態與執行中的 Console 內容。
 - **深淺色主題切換**：內建 Light / Dark 主題模式，使用者偏好自動儲存於 `localStorage`。
 - **全域組態與資料持久化**：單一全域 JSON 設定檔 (`/app/data/config.json`)，透過 Docker Volume 實現重啟後設定不遺失。
 - **安全代理機制**：後端隔離 Jenkins 憑證，密碼遮罩傳輸，前端不直連 Jenkins。
@@ -172,17 +172,17 @@ flowchart TD
         JenkinsAPI["Jenkins Remote JSON API\n(http://10.88.95.1:8080)"]
     end
 
-    UI -->|全天每 5 秒讀取快取| Server
+    UI -->|全天每 10 秒讀取快取| Server
     Server -->|讀取快取| MemCache
     Server -->|讀寫組態| Store
-    Scheduler -->|Job 每 60 秒 / Console 每 5 秒| JenkinsAPI
+    Scheduler -->|Job 每 60 秒 / Console 每 10 秒| JenkinsAPI
     Scheduler -->|更新快取| MemCache
     Store -.->|持久化掛載| DockerVolume[(Docker Volume:\ndashboard_data)]
 ```
 
 ### 架構設計亮點
 1. **API 隔離與安全代理**：前端完全不直連 Jenkins，所有連線由後端 Express 代理，防止 Jenkins 憑證暴露於客戶端。
-2. **記憶體快取與負載緩解**：後端 Scheduler 每 60 秒同步 Jenkins Job 狀態；只有執行中的 Build 會每 5 秒漸進讀取新增 console 內容，首次最多載入最後 64 KB。前端瀏覽器每 5 秒直接讀取伺服器快取，不會因電視牆數量增加而對 Jenkins 產生等比例負載。
+2. **記憶體快取與負載緩解**：後端 Scheduler 每 60 秒同步 Jenkins Job 狀態；只有執行中的 Build 會每 10 秒漸進讀取新增 console 內容，首次最多載入最後 64 KB。前端瀏覽器每 10 秒直接讀取伺服器快取，不會因電視牆數量增加而對 Jenkins 產生等比例負載。
 3. **無依賴前端**：不使用 React/Vue/Webpack 等構建工具，原生 JavaScript、CSS Custom Properties 與 HTML5 Canvas，體積輕巧、載入極速。
 4. **單一儲存結構**：所有卡片與連線設定以結構化 JSON 保存在 `data/config.json`，透過 Docker Volume `dashboard_data` 實現跨重啟持久化。
 
@@ -234,7 +234,7 @@ d:\CICD_ROBOT\TestFarmDashBoard\
 > ⚠️ 若部署於 **Linux** 主機：容器以非 root 使用者 (uid 1001) 執行，而 bind mount 會沿用主機端目錄的擁有者。若 `./data` 為 root 所有，容器將無法寫入設定。請先執行 `sudo chown -R 1001:1001 ./data`，或改用 Named Volume。Windows / Docker Desktop 無此問題。
 
 ### Q3: 看板是否會在平日晚上或週末更新？
-會。看板全天候顯示卡片狀態，前端每 5 秒讀取後端快取；瀏覽器頁籤從背景恢復時也會立即刷新。
+會。看板全天候顯示卡片狀態，前端每 10 秒讀取後端快取；瀏覽器頁籤從背景恢復時也會立即刷新。
 
 ### Q4: 容器 Health Check 失敗 (unhealthy)？
 可檢查容器內部 `/api/settings` 是否正常回應：

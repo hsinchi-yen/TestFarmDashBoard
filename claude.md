@@ -104,7 +104,7 @@ Port 4000 is used (avoids 8080 and 3000 conflicts).
 - `lastBuild.duration` is `0` while a build is running — fall back to
   `lastDuration` (from `lastCompletedBuild`) so the card does not show "N/A".
 - The dashboard reuses card DOM nodes keyed by `card.id` and only rebuilds the
-  grid on a page turn or layout change. A plain 60s data refresh updates text in
+  grid on a page turn or layout change. A plain 10s data refresh updates text in
   place, so it no longer flickers or replays the entry animation. If you add a
   field to a card, add a ref in `createCardNode` and set it in `updateCardNode` —
   do not go back to rebuilding `innerHTML` on every refresh.

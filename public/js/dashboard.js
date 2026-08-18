@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', init);
 /* ------------------------------------------------------------------ *
  * Constants
  * ------------------------------------------------------------------ */
-const DATA_REFRESH_MS = 5000;       // keep live console text responsive while builds run
+const DATA_REFRESH_MS = 10000;      // near-real-time display with half the request rate
 const TICK_MS = 30000;              // refresh of relative times / highlight state
 const IDLE_RESUME_MS = 60000;       // resume auto-rotation this long after user input
 const DEFAULT_ROTATE_SEC = 30;

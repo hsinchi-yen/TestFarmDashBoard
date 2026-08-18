@@ -17,12 +17,12 @@ This document provides guidance for AI agents working on this project.
 ### Architecture
 1. Backend acts as a Jenkins API proxy — frontend never directly calls Jenkins
 2. Backend polls Jenkins every 60 seconds and caches results in memory
-3. Frontend polls backend every 60 seconds for cached data
+3. Frontend polls backend every 10 seconds for cached data
 4. Single JSON file stores all configuration (Jenkins credentials, cards, settings)
 5. Docker Volume persists the config file across container restarts
 
 ### Frontend Behavior
-1. Dashboard polling runs around the clock and refreshes cached state every 5 seconds
+1. Dashboard polling runs around the clock and refreshes cached state every 10 seconds
 2. Returning a hidden browser tab to the foreground triggers an immediate refresh
 3. Grid sizes: 3x3, 4x4, 5x5 — toolbar selection persists per browser and takes precedence over server refreshes
 4. Pagination: cards exceeding grid capacity auto-paginate, auto-rotation on
@@ -45,7 +45,7 @@ This document provides guidance for AI agents working on this project.
    last duration, node online/offline row, 10-build trend chart
 3. Toolbar: grid size buttons, page indicator, "newest finished" chip, date,
    theme toggle, config page link, last-updated / stale-data indicator
-4. Auto-refreshes via polling (only during work hours)
+4. Auto-refreshes every 10 seconds around the clock
 5. Never scrolls — the grid is pinned to `100vh` and cards drop their lower rows
    through `@container` queries when space runs out
 

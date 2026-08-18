@@ -1,5 +1,5 @@
 const POLL_INTERVAL_MS = 60000;
-const CONSOLE_POLL_INTERVAL_MS = 5000;
+const CONSOLE_POLL_INTERVAL_MS = 10000;
 const MAX_CONCURRENT_JOBS = 5;
 
 let cache = {};
@@ -211,6 +211,8 @@ function getLastPollAt() {
 }
 
 module.exports = {
+  POLL_INTERVAL_MS,
+  CONSOLE_POLL_INTERVAL_MS,
   startPolling,
   pollOnce,
   getCachedData,
