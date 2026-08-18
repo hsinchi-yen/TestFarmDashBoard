@@ -107,7 +107,7 @@ function toggleTheme() {
 function updateDateDisplay() {
   if (!dom.currentDate) return;
   const options = { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
-  dom.currentDate.textContent = new Date(now()).toLocaleDateString('zh-TW', options);
+  dom.currentDate.textContent = new Date(now()).toLocaleDateString('en-US', options);
 }
 
 /* ------------------------------------------------------------------ *
@@ -205,13 +205,13 @@ function updateFreshnessLabel(errorMessage) {
   const stale = lastPollAt && (now() - lastPollAt) > STALE_DATA_MS;
 
   if (errorMessage) {
-    dom.lastUpdated.textContent = `⚠️ 連線失敗 (${errorMessage})`;
+    dom.lastUpdated.textContent = `⚠️ Connection failed (${errorMessage})`;
     dom.lastUpdated.classList.add('last-updated--stale');
   } else if (stale) {
-    dom.lastUpdated.textContent = `⚠️ 資料過舊 · ${formatRelativeTime(lastPollAt)}`;
+    dom.lastUpdated.textContent = `⚠️ Data is stale - ${formatRelativeTime(lastPollAt)}`;
     dom.lastUpdated.classList.add('last-updated--stale');
   } else {
-    dom.lastUpdated.textContent = `Last updated: ${new Date(now()).toLocaleTimeString('zh-TW')}`;
+    dom.lastUpdated.textContent = `Last updated: ${new Date(now()).toLocaleTimeString('en-US')}`;
     dom.lastUpdated.classList.remove('last-updated--stale');
   }
 }
@@ -270,8 +270,8 @@ function updateLatestChip() {
   const result = (card.lastCompleted && card.lastCompleted.result) || (card.lastBuild && card.lastBuild.result) || '';
   dom.latestChip.style.display = 'inline-flex';
   dom.latestChip.dataset.result = result.toLowerCase();
-  dom.latestChip.textContent = `🆕 最新完成：${card.alias || card.jobName} · ${formatRelativeTime(latestFinishedAt)}`;
-  dom.latestChip.title = `完成於 ${new Date(latestFinishedAt).toLocaleString('zh-TW')}`;
+  dom.latestChip.textContent = `🆕 Latest completed: ${card.alias || card.jobName} - ${formatRelativeTime(latestFinishedAt)}`;
+  dom.latestChip.title = `Completed at ${new Date(latestFinishedAt).toLocaleString('en-US')}`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -342,7 +342,7 @@ function createCardNode(card) {
       </div>
       <div class="card__status-row">
         <span class="card__status-label"></span>
-        <span class="card__latest-badge">🆕 剛完成</span>
+        <span class="card__latest-badge">🆕 Just finished</span>
       </div>
       <div class="card__console" data-ref="console" hidden>
         <span class="card__console-prompt">&gt;_</span>
@@ -351,15 +351,15 @@ function createCardNode(card) {
       </div>
       <div class="card__info">
         <div class="card__info-item">
-          <span class="label">✅ 上次成功</span>
+          <span class="label">✅ Last success</span>
           <span class="value" data-ref="success"></span>
         </div>
         <div class="card__info-item">
-          <span class="label">❌ 上次失敗</span>
+          <span class="label">❌ Last failure</span>
           <span class="value" data-ref="failure"></span>
         </div>
         <div class="card__info-item card__info-item--duration">
-          <span class="label">⏱ 上次費時</span>
+          <span class="label">⏱ Last duration</span>
           <span class="value" data-ref="duration"></span>
         </div>
       </div>
@@ -401,7 +401,7 @@ function updateCardNode(node, card) {
   node.el.dataset.id = card.id;
   node.el.dataset.activity = isBuildRunning(card) ? 'building' : 'idle';
 
-  const displayName = card.alias || card.jobName || '(未命名)';
+  const displayName = card.alias || card.jobName || '(Unnamed)';
   setText(node.name, displayName);
   node.name.title = card.jobName || displayName;
 
@@ -425,17 +425,17 @@ function updateCardNode(node, card) {
   setText(node.success, card.lastSuccessful
     ? `#${card.lastSuccessful.number} (${formatRelativeTime(card.lastSuccessful.timestamp)})`
     : 'N/A');
-  node.success.title = card.lastSuccessful ? new Date(card.lastSuccessful.timestamp).toLocaleString('zh-TW') : '';
+  node.success.title = card.lastSuccessful ? new Date(card.lastSuccessful.timestamp).toLocaleString('en-US') : '';
 
   setText(node.failure, card.lastFailed
     ? `#${card.lastFailed.number} (${formatRelativeTime(card.lastFailed.timestamp)})`
     : 'N/A');
-  node.failure.title = card.lastFailed ? new Date(card.lastFailed.timestamp).toLocaleString('zh-TW') : '';
+  node.failure.title = card.lastFailed ? new Date(card.lastFailed.timestamp).toLocaleString('en-US') : '';
 
   setText(node.duration, formatDuration(getDisplayDuration(card)));
 
   const nodeLabel = card.nodeName && card.nodeName !== 'Unknown' ? card.nodeName : '';
-  setText(node.node, `${isOffline ? '🔌🔴' : '🔌🟢'} ${isOffline ? 'Offline' : 'Online'}${nodeLabel ? ' · ' + nodeLabel : ''}`);
+  setText(node.node, `${isOffline ? '🔌🔴' : '🔌🟢'} ${isOffline ? 'Offline' : 'Online'}${nodeLabel ? ' - ' + nodeLabel : ''}`);
   node.node.classList.toggle('card__node--offline', isOffline);
 }
 
@@ -493,12 +493,13 @@ function formatDuration(ms) {
 function formatRelativeTime(timestamp) {
   if (!timestamp) return 'N/A';
   const diff = now() - timestamp;
-  if (diff < 60000) return '剛剛';
+  if (diff < 60000) return 'just now';
   const m = Math.floor(diff / 60000);
-  if (m < 60) return `${m} 分鐘前`;
+  if (m < 60) return `${m} minute${m === 1 ? '' : 's'} ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} 小時前`;
-  return `${Math.floor(h / 24)} 天前`;
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+  const days = Math.floor(h / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 /* ------------------------------------------------------------------ *

@@ -98,7 +98,7 @@ async function loadJenkinsConfig() {
       dom.url.value = config.url || '';
       dom.user.value = config.username || '';
       dom.pass.value = '';
-      dom.pass.placeholder = config.hasPassword ? '已設定，若不修改請留空' : '尚未設定密碼';
+      dom.pass.placeholder = config.hasPassword ? 'Password is set; leave blank to keep it' : 'No password configured';
     }
   } catch (e) {
     console.error('Failed to load jenkins config', e);
@@ -106,7 +106,7 @@ async function loadJenkinsConfig() {
 }
 
 async function testConnection() {
-  dom.connStatus.textContent = '測試中...';
+  dom.connStatus.textContent = 'Testing...';
   dom.connStatus.className = 'connection-status';
   
   try {
@@ -124,14 +124,14 @@ async function testConnection() {
     
     const data = await res.json();
     if (data.success) {
-      dom.connStatus.textContent = '✅ 連線成功！';
+      dom.connStatus.textContent = '✅ Connection successful!';
       dom.connStatus.className = 'connection-status success';
     } else {
-      dom.connStatus.textContent = `❌ 連線失敗: ${data.message || '未知錯誤'}`;
+      dom.connStatus.textContent = `❌ Connection failed: ${data.message || 'Unknown error'}`;
       dom.connStatus.className = 'connection-status error';
     }
   } catch (e) {
-    dom.connStatus.textContent = `❌ 連線失敗: ${e.message}`;
+    dom.connStatus.textContent = `❌ Connection failed: ${e.message}`;
     dom.connStatus.className = 'connection-status error';
   }
 }
@@ -154,16 +154,16 @@ async function saveJenkinsConfig(e) {
     });
     
     if (res.ok) {
-      showToast('設定已儲存');
+      showToast('Settings saved');
       dom.pass.value = '';
-      dom.pass.placeholder = '已設定，若不修改請留空';
+      dom.pass.placeholder = 'Password is set; leave blank to keep it';
       // Auto-reload jobs after saving config
       await fetchJobs();
     } else {
-      showToast('儲存失敗', 'error');
+      showToast('Failed to save settings', 'error');
     }
   } catch (e) {
-    showToast('儲存失敗', 'error');
+    showToast('Failed to save settings', 'error');
   }
 }
 
@@ -171,8 +171,8 @@ async function saveJenkinsConfig(e) {
 async function fetchJobs() {
   try {
     dom.refreshJobsBtn.disabled = true;
-    dom.refreshJobsBtn.textContent = '⏳ 載入中...';
-    dom.jobStatus.textContent = '正在從 Jenkins 載入...';
+    dom.refreshJobsBtn.textContent = '⏳ Loading...';
+    dom.jobStatus.textContent = 'Loading jobs from Jenkins...';
     
     const res = await fetch('/api/jenkins/jobs');
     if (res.ok) {
@@ -181,22 +181,22 @@ async function fetchJobs() {
       updateJobDropdown();
       
       if (allJobs.length === 0) {
-        dom.jobStatus.textContent = '⚠️ 未找到任何 Job，請先設定 Jenkins 連線';
+        dom.jobStatus.textContent = '⚠️ No jobs found. Configure the Jenkins connection first.';
       } else {
         const available = getAvailableJobs();
-        dom.jobStatus.textContent = `共 ${allJobs.length} 個 Jobs，${available.length} 個可新增`;
+        dom.jobStatus.textContent = `${allJobs.length} jobs found; ${available.length} available to add`;
       }
     } else {
-      dom.jobStatus.textContent = '❌ 無法取得 Jobs 列表';
-      showToast('無法取得 Jobs 列表', 'error');
+      dom.jobStatus.textContent = '❌ Unable to retrieve the job list';
+      showToast('Unable to retrieve the job list', 'error');
     }
   } catch (e) {
     console.error('fetchJobs error:', e);
-    dom.jobStatus.textContent = '❌ 載入失敗: ' + e.message;
-    showToast('無法取得 Jobs 列表: ' + e.message, 'error');
+    dom.jobStatus.textContent = '❌ Loading failed: ' + e.message;
+    showToast('Unable to retrieve the job list: ' + e.message, 'error');
   } finally {
     dom.refreshJobsBtn.disabled = false;
-    dom.refreshJobsBtn.textContent = '🔄 重新載入 Jobs';
+    dom.refreshJobsBtn.textContent = '🔄 Reload Jobs';
   }
 }
 
@@ -213,7 +213,7 @@ function updateJobDropdown() {
   if (available.length === 0) {
     const opt = document.createElement('option');
     opt.value = '';
-    opt.textContent = allJobs.length === 0 ? '-- 無可用 Jobs --' : '-- 所有 Jobs 已加入 --';
+    opt.textContent = allJobs.length === 0 ? '-- No jobs available --' : '-- All jobs are already monitored --';
     dom.jobSelect.appendChild(opt);
     dom.jobSelect.disabled = true;
     dom.addJobBtn.disabled = true;
@@ -221,7 +221,7 @@ function updateJobDropdown() {
     // Default placeholder
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = `-- 請選擇 Job (${available.length} 個可新增) --`;
+    placeholder.textContent = `-- Select a job (${available.length} available) --`;
     dom.jobSelect.appendChild(placeholder);
     
     // Add available jobs sorted alphabetically
@@ -259,7 +259,7 @@ async function addSelectedJob() {
   if (!jobName) return;
   
   dom.addJobBtn.disabled = true;
-  dom.addJobBtn.textContent = '新增中...';
+  dom.addJobBtn.textContent = 'Adding...';
   
   try {
     const res = await fetch('/api/cards', {
@@ -269,19 +269,19 @@ async function addSelectedJob() {
     });
     
     if (res.ok) {
-      showToast(`✅ 已新增 "${jobName}"`);
+      showToast(`✅ Added "${jobName}"`);
       await loadCards();       // Refresh card manager
       updateJobDropdown();     // Remove from dropdown
       
       const available = getAvailableJobs();
-      dom.jobStatus.textContent = `共 ${allJobs.length} 個 Jobs，${available.length} 個可新增`;
+      dom.jobStatus.textContent = `${allJobs.length} jobs found; ${available.length} available to add`;
     } else {
-      showToast('新增失敗', 'error');
+      showToast('Failed to add job', 'error');
     }
   } catch (e) {
-    showToast('新增失敗: ' + e.message, 'error');
+    showToast('Failed to add job: ' + e.message, 'error');
   } finally {
-    dom.addJobBtn.textContent = '＋ 新增';
+    dom.addJobBtn.textContent = '＋ Add';
   }
 }
 
@@ -303,7 +303,7 @@ function renderCards() {
   dom.cardManager.innerHTML = '';
   
   if (trackedCards.length === 0) {
-    dom.cardManager.innerHTML = '<p style="color: var(--color-text-secondary); text-align: center; padding: 24px;">尚未新增任何監控 Job，請從上方下拉選單選擇</p>';
+    dom.cardManager.innerHTML = '<p style="color: var(--color-text-secondary); text-align: center; padding: 24px;">No monitored jobs yet. Select one from the list above.</p>';
     return;
   }
   
@@ -319,7 +319,7 @@ function renderCards() {
         <input type="text" class="manage-card__alias" value="${escapeHtml(card.alias || card.jobName)}" data-id="${escapeHtml(card.id)}" maxlength="120">
         <span class="manage-card__job">${escapeHtml(card.jobName)}</span>
       </div>
-      <button class="icon-btn btn-delete" data-id="${escapeHtml(card.id)}" title="移除">🗑️</button>
+      <button class="icon-btn btn-delete" data-id="${escapeHtml(card.id)}" title="Remove">🗑️</button>
     `;
     
     // Drag events
@@ -396,7 +396,7 @@ async function saveReorder() {
     });
     loadCards(); // refresh
   } catch (e) {
-    showToast('排序儲存失敗', 'error');
+    showToast('Failed to save job order', 'error');
   }
 }
 
@@ -410,7 +410,7 @@ async function updateAlias(id, alias) {
     });
     loadCards();
   } catch (e) {
-    showToast('更新失敗', 'error');
+    showToast('Failed to update alias', 'error');
   }
 }
 
@@ -434,17 +434,17 @@ async function confirmDelete() {
       method: 'DELETE'
     });
     if (res.ok) {
-      showToast('已刪除');
+      showToast('Job removed');
       await loadCards();
       updateJobDropdown(); // Re-add to dropdown as available
       
       const available = getAvailableJobs();
-      dom.jobStatus.textContent = `共 ${allJobs.length} 個 Jobs，${available.length} 個可新增`;
+      dom.jobStatus.textContent = `${allJobs.length} jobs found; ${available.length} available to add`;
     } else {
-      showToast('刪除失敗', 'error');
+      showToast('Failed to remove job', 'error');
     }
   } catch (e) {
-    showToast('刪除失敗', 'error');
+    showToast('Failed to remove job', 'error');
   } finally {
     closeDeleteModal();
   }
