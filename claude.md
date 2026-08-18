@@ -22,7 +22,7 @@ A Dockerized web dashboard for monitoring Jenkins test build statuses in real-ti
   cards pulses with a coloured glow + 「🆕 剛完成」 badge for 8 hours after it finishes,
   and is mirrored as a chip in the toolbar (the card may be on another page).
   Finish time is `timestamp + duration`, since Jenkins `timestamp` is the build *start*.
-- Grid layout: 3x3, 4x4, 5x5 switchable; cards shed their lower rows via CSS
+- Grid layout: 3x3, 4x4, 5x5 switchable and persisted per browser; cards shed their lower rows via CSS
   `@container` queries as the grid gets denser, so the board never scrolls
 - Auto-pagination with rotation (`settings.autoRotateInterval`, default 30s);
   rotation is skipped entirely when there is only one page

@@ -24,7 +24,7 @@ This document provides guidance for AI agents working on this project.
 ### Frontend Behavior
 1. Dashboard polling runs around the clock and refreshes cached state every 5 seconds
 2. Returning a hidden browser tab to the foreground triggers an immediate refresh
-3. Grid sizes: 3x3, 4x4, 5x5 — user switches via buttons in dashboard toolbar
+3. Grid sizes: 3x3, 4x4, 5x5 — toolbar selection persists per browser and takes precedence over server refreshes
 4. Pagination: cards exceeding grid capacity auto-paginate, auto-rotation on
    `settings.autoRotateInterval` (default 30s); skipped when there is only one page
 5. Theme: light/dark toggle, preference saved in localStorage

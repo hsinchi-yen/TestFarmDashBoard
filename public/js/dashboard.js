@@ -13,7 +13,11 @@ const STALE_DATA_MS = 5 * 60 * 1000;             // warn when the poller stops u
 /* ------------------------------------------------------------------ *
  * State
  * ------------------------------------------------------------------ */
-let settings = { gridSize: '4x4', autoRotateInterval: DEFAULT_ROTATE_SEC };
+let preferredGridSize = GridPreference.loadGridSize(localStorage);
+let settings = {
+  gridSize: GridPreference.resolveGridSize(preferredGridSize, null),
+  autoRotateInterval: DEFAULT_ROTATE_SEC
+};
 let allCards = [];
 let currentPage = 1;
 let clockOffset = 0;          // serverTime - browser time, corrects a skewed kiosk clock
@@ -64,7 +68,7 @@ async function init() {
   window.addEventListener('resize', onWindowResize);
   document.addEventListener('visibilitychange', onVisibilityChange);
 
-  applyGridSize(settings.gridSize, { persist: false });
+  applyGridSize(settings.gridSize);
 
   updateDateDisplay();
   tickInterval = setInterval(tick, TICK_MS);
@@ -110,11 +114,26 @@ function updateDateDisplay() {
  * Grid size
  * ------------------------------------------------------------------ */
 async function setGridSize(size) {
-  if (!size || size === settings.gridSize) return;
-  applyGridSize(size);
+  if (!GridPreference.isValidGridSize(size)) return;
+
+  preferredGridSize = size;
+  GridPreference.saveGridSize(localStorage, size);
+  if (size !== settings.gridSize) applyGridSize(size);
+
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gridSize: size }),
+      keepalive: true
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (error) {
+    console.error('Error saving grid size', error);
+  }
 }
 
-function applyGridSize(size, { persist = true } = {}) {
+function applyGridSize(size) {
   settings.gridSize = size;
   dom.gridBtns.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.grid === size);
@@ -124,13 +143,6 @@ function applyGridSize(size, { persist = true } = {}) {
   // The page count just changed: 5x5 may have been a single page while 3x3 needs
   // rotation (or vice versa), so re-evaluate rather than waiting for the next tick.
   if (dataInterval) startRotation();
-
-  if (!persist) return;
-  fetch('/api/settings', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gridSize: size })
-  }).catch(e => console.error('Error saving grid size', e));
 }
 
 function getPageSize() {
@@ -151,8 +163,13 @@ async function fetchDashboardData() {
     lastPollAt = state.lastPollAt || null;
     let gridChanged = false;
     if (state.settings && state.settings.gridSize) {
-      gridChanged = settings.gridSize !== state.settings.gridSize;
-      settings.gridSize = state.settings.gridSize;
+      const nextGridSize = GridPreference.resolveGridSize(
+        preferredGridSize,
+        state.settings.gridSize,
+        settings.gridSize
+      );
+      gridChanged = settings.gridSize !== nextGridSize;
+      settings.gridSize = nextGridSize;
       if (gridChanged) {
         dom.gridBtns.forEach(btn => {
           btn.classList.toggle('active', btn.dataset.grid === settings.gridSize);
