@@ -22,6 +22,18 @@ test('shows completed-build trends only in the 3x3 layout', () => {
   );
 });
 
+test('shows Online Status in 3x3 and 4x4 but hides it in 5x5', () => {
+  assert.match(
+    css,
+    /\.grid-3x3\s+\.card__node-row\s*{[^}]*display:\s*flex;[^}]*flex:\s*0\s+0\s+auto;/s
+  );
+  assert.match(
+    css,
+    /\.grid-4x4\s+\.card__node-row\s*{[^}]*display:\s*flex;[^}]*flex:\s*0\s+0\s+auto;/s
+  );
+  assert.match(css, /\.grid-5x5\s+\.card__node-row\s*{[^}]*display:\s*none;/s);
+});
+
 test('wraps the complete live TEST CASE instead of truncating it', () => {
   const consoleTextRule = css.match(/\.card__console-text\s*{([^}]*)}/s);
   assert.ok(consoleTextRule, 'card__console-text rule is required');

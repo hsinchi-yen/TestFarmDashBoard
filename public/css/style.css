@@ -335,6 +335,11 @@ body {
   overflow: visible;
 }
 
+.grid-3x3 .card__node-row {
+  display: flex;
+  flex: 0 0 auto;
+}
+
 .grid-3x3 .card--building .card__info,
 .grid-3x3 .card__info-item--duration {
   display: flex;
@@ -362,6 +367,8 @@ body {
 }
 
 .grid-4x4 .card__node-row {
+  display: flex;
+  flex: 0 0 auto;
   margin-bottom: 0;
 }
 
@@ -412,6 +419,7 @@ body {
 }
 
 .grid-5x5 .card__node-row {
+  display: none;
   margin-bottom: 0;
 }
 
@@ -724,14 +732,24 @@ body {
 
 @container card (max-height: 195px) {
   .card__trend { display: none; }
+  .grid-3x3 .card__trend { display: none; }
   .card__info-item { font-size: 0.8125rem; }
 }
 
 @container card (max-height: 160px) {
   .card__name { font-size: 0.9375rem; }
   .card__node-row { display: none; }
+  .grid-3x3 .card__node-row,
+  .grid-4x4 .card__node-row { display: flex; }
+  .grid-3x3 .card__header { order: 1; }
+  .grid-3x3 .card__status-row { order: 2; }
+  .grid-3x3 .card__node-row { order: 3; }
+  .grid-3x3 .card__console { order: 4; }
+  .grid-3x3 .card__info { order: 5; }
+  .grid-3x3 .card__trend { order: 6; }
   .card__info { gap: 2px; }
   .card--building .card__info { display: none; }
+  .grid-3x3 .card--building .card__info { display: none; }
   .card__console { margin-bottom: 2px; padding-block: 2px; }
 }
 
