@@ -38,8 +38,15 @@
     return isValidGridSize(fallback) ? fallback : '4x4';
   }
 
+  function getGridCapacity(gridSize) {
+    if (!isValidGridSize(gridSize)) return 16;
+    const [columns, rows] = gridSize.split('x').map(Number);
+    return columns * rows;
+  }
+
   return {
     GRID_SIZE_STORAGE_KEY,
+    getGridCapacity,
     isValidGridSize,
     loadGridSize,
     resolveGridSize,

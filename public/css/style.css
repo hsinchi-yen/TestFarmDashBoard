@@ -315,12 +315,110 @@ body {
 .grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); }
 .grid-5x5 { grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); }
 
-/* The 3x3 wall view prioritizes the current test details over history bars. */
-.grid-3x3 .card__trend { display: none; }
-.grid-3x3 .card__info { display: flex; flex: 0 0 auto; overflow: visible; }
-.grid-3x3 .card--building .card__info { display: flex; }
-.grid-3x3 .card__info-item--duration { display: flex; }
-.grid-3x3 .card__node-row { display: none; }
+/* Keep one card structure across every density. The 1920x1080 3x3 view has
+   enough vertical room for history; denser layouts reserve that room for the
+   complete live TEST CASE and the three summary rows. */
+.grid-3x3 .card__trend {
+  display: block;
+  height: 52px;
+  min-height: 52px;
+}
+
+.grid-4x4 .card__trend,
+.grid-5x5 .card__trend {
+  display: none;
+}
+
+.grid-3x3 .card__info {
+  display: flex;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.grid-3x3 .card--building .card__info,
+.grid-3x3 .card__info-item--duration {
+  display: flex;
+}
+
+/* At 1920x1080 the denser grids keep the exact same content order, but tighten
+   typography and spacing so a wrapped live TEST CASE never covers the summary
+   or node rows. */
+.grid-4x4 .card__status-row {
+  margin-bottom: 4px;
+}
+
+.grid-4x4 .card__console {
+  margin-bottom: 4px;
+  padding: 3px 6px;
+  font-size: 0.625rem;
+  line-height: 1.2;
+}
+
+.grid-4x4 .card__info {
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-bottom: 3px;
+  overflow: visible;
+}
+
+.grid-4x4 .card__node-row {
+  margin-bottom: 0;
+}
+
+.grid-5x5 .card__body {
+  padding: 6px 12px;
+}
+
+.grid-5x5 .card__header {
+  margin-bottom: 2px;
+}
+
+.grid-5x5 .card__name {
+  font-size: 0.875rem;
+  line-height: 1.15;
+}
+
+.grid-5x5 .card__build-number {
+  font-size: 0.75rem;
+}
+
+.grid-5x5 .card__status-row {
+  min-height: 14px;
+  margin-bottom: 2px;
+}
+
+.grid-5x5 .card__status-label {
+  font-size: 0.625rem;
+}
+
+.grid-5x5 .card__console {
+  gap: 3px;
+  margin-bottom: 2px;
+  padding: 2px 5px;
+  font-size: 0.5625rem;
+  line-height: 1.15;
+}
+
+.grid-5x5 .card__info {
+  flex: 0 0 auto;
+  gap: 0;
+  margin-bottom: 1px;
+  overflow: visible;
+}
+
+.grid-5x5 .card__info-item {
+  font-size: 0.6875rem;
+  line-height: 1.2;
+}
+
+.grid-5x5 .card__node-row {
+  margin-bottom: 0;
+}
+
+.grid-5x5 .card__node {
+  font-size: 0.625rem;
+  line-height: 1.15;
+}
 
 /* Cards */
 .card {

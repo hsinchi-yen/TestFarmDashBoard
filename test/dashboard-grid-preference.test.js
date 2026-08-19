@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   GRID_SIZE_STORAGE_KEY,
+  getGridCapacity,
   loadGridSize,
   resolveGridSize,
   saveGridSize
@@ -45,4 +46,11 @@ test('ignores invalid stored values', () => {
 
   assert.equal(loadGridSize(storage), null);
   assert.equal(resolveGridSize(null, '5x5'), '5x5');
+});
+
+test('uses the exact card capacity for every grid density', () => {
+  assert.equal(getGridCapacity('3x3'), 9);
+  assert.equal(getGridCapacity('4x4'), 16);
+  assert.equal(getGridCapacity('5x5'), 25);
+  assert.equal(getGridCapacity('invalid'), 16);
 });

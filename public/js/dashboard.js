@@ -146,8 +146,7 @@ function applyGridSize(size) {
 }
 
 function getPageSize() {
-  const [cols, rows] = settings.gridSize.split('x').map(Number);
-  return (cols || 4) * (rows || 4);
+  return GridPreference.getGridCapacity(settings.gridSize);
 }
 
 /* ------------------------------------------------------------------ *
@@ -325,7 +324,7 @@ function renderPage(pageNum, { rebuild = false } = {}) {
   const palette = readChartPalette();
   pageCards.forEach(card => {
     const node = cardNodes.get(card.id);
-    drawTrendChart(node.canvas, (card.builds || []).slice(0, 10).reverse(), palette);
+    drawTrendChart(node.canvas, TrendHistory.prepareTrendBuilds(card.builds), palette);
   });
 }
 
@@ -524,6 +523,15 @@ function readChartPalette() {
 
 function drawTrendChart(canvas, builds, palette) {
   if (!canvas) return;
+  const buildNumbers = (builds || []).map(build => `#${build.number}`);
+  canvas.dataset.buildNumbers = buildNumbers.join(',');
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute(
+    'aria-label',
+    buildNumbers.length
+      ? `Completed build trend, oldest to newest: ${buildNumbers.join(', ')}`
+      : 'No completed build history'
+  );
   const cssWidth = canvas.clientWidth;
   const cssHeight = canvas.clientHeight;
   if (!cssWidth || !cssHeight) return;
@@ -572,7 +580,7 @@ function redrawAllCharts() {
   const start = (currentPage - 1) * pageSize;
   allCards.slice(start, start + pageSize).forEach(card => {
     const node = cardNodes.get(card.id);
-    if (node) drawTrendChart(node.canvas, (card.builds || []).slice(0, 10).reverse(), palette);
+    if (node) drawTrendChart(node.canvas, TrendHistory.prepareTrendBuilds(card.builds), palette);
   });
 }
 
